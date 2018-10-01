@@ -1,0 +1,11 @@
+notifications:
+  email: false
+language: go
+go:
+- 1.10.x
+sudo: false
+jobs:
+  include:
+  - stage: Unit tests
+    script:
+      - go test ./whisper/...
