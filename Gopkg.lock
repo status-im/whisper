@@ -2,18 +2,20 @@
 
 
 [[projects]]
-  digest = "1:8ba904411c0c2ccf235e992c9d16954d173783cb7ce2d8d2ff798aec2d5cd9a6"
+  branch = "master"
+  digest = "1:40a3716965c1e46688a3290d8043f5bbdfbcb218e4c1327384049a7ec2df92e0"
   name = "github.com/aristanetworks/goarista"
   packages = ["monotime"]
   pruneopts = "T"
-  revision = "ea17b1a17847fb6e4c0a91de0b674704693469b0"
+  revision = "ff33da284e760fcdb03c33d37a719e5ed30ba844"
 
 [[projects]]
-  digest = "1:5e46788fe94f6d9d9d1bdc88218cf57bbfa5fbcdeae7ed0e0482cc67fe063a21"
+  branch = "master"
+  digest = "1:e599801f29de116faca9d3c1937c0f03c7629de72dab7365684179068d2cd315"
   name = "github.com/btcsuite/btcd"
   packages = ["btcec"]
   pruneopts = "T"
-  revision = "2e60448ffcc6bf78332d1fe590260095f554dd78"
+  revision = "2a560b2036bee5e3679ec2133eb6520b2f195213"
 
 [[projects]]
   digest = "1:e47d51dab652d26c3fba6f8cba403f922d02757a82abdc77e90df7948daf296e"
@@ -24,7 +26,7 @@
   version = "v1.7.1"
 
 [[projects]]
-  digest = "1:c24d17ef5d37ae7215811cf1cade45822faa232d6bcfbadff30bbeba52225a98"
+  digest = "1:cf53a6be6cf3d947c0c7fb678237a7b34e06e4102411ecb843eedacb46759995"
   name = "github.com/ethereum/go-ethereum"
   packages = [
     "common",
@@ -47,26 +49,29 @@
     "rpc",
   ]
   pruneopts = "T"
-  revision = "477eb0933b9529f7deeccc233cc815fe34a8ea56"
+  revision = "56c2fa69e0224e8f939a092b3aba20b23bb95c26"
+  source = "github.com/status-im/go-ethereum"
   version = "v1.8.16"
 
 [[projects]]
-  digest = "1:33542eaf895b5489ccfb059502a721f0e8875379da8b3ff60fdd9212d503705c"
+  digest = "1:586ea76dbd0374d6fb649a91d70d652b7fe0ccffb8910a77468e7702e7901f3d"
   name = "github.com/go-stack/stack"
   packages = ["."]
   pruneopts = "T"
-  revision = "54be5f394ed2c3e19dac9134a40a95ba5a017f7b"
-  version = "v1.5.4"
+  revision = "2fee6af1a9795aafbe0253a0cfbdf668e1fb8a9a"
+  version = "v1.8.0"
 
 [[projects]]
-  digest = "1:cf5bb7d7c59d8313289e5b756e24462cacd958d1e6db3bdbe1c800c677ad0f94"
+  branch = "master"
+  digest = "1:6027b20c168728321bd99ad01f35118eded457b01c03e647a84833ab331f2f5b"
   name = "github.com/golang/snappy"
   packages = ["."]
   pruneopts = "T"
-  revision = "553a641470496b2327abcac10b36396bd98e45c9"
+  revision = "2e65f85255dbc3072edf28d6b5b8efc472979f5a"
 
 [[projects]]
-  digest = "1:fd5076bec7b8e80060cb2b103e800b27bcc6302eb9f7454d20f70cfed6791f75"
+  branch = "master"
+  digest = "1:202e4a1a283dd740ca9d131787e73bb9d69611a01ef86e82ed262e035b0dd792"
   name = "github.com/huin/goupnp"
   packages = [
     ".",
@@ -78,30 +83,23 @@
     "ssdp",
   ]
   pruneopts = "T"
-  revision = "679507af18f3c7ba2bcc7905392ce23e148661c3"
+  revision = "1395d1447324cbea88d249fbfcfd70ea878fdfca"
 
 [[projects]]
-  digest = "1:5314fcaf8f5945704c768b4664b75ff2d3e99fe9b6ec7d20151696874574100d"
+  digest = "1:32b82e71cf24f8b78323e0d7903c4b90278486283965aa2a19b1ea13763b8f34"
   name = "github.com/jackpal/go-nat-pmp"
   packages = ["."]
   pruneopts = "T"
-  revision = "1fa385a6f45828c83361136b45b1a21a12139493"
+  revision = "c9cfead9f2a36ddf3daa40ba269aa7f4bbba6b62"
+  version = "v1.0.1"
 
 [[projects]]
-  digest = "1:613400d7688f0486bec153e7f6bb5323b7446a2a064e4246e0378bf77ea91deb"
+  digest = "1:6cae6970d70fc5fe75bf83c48ee33e9c4c561a62d0b033254bee8dd5942b815a"
   name = "github.com/rs/cors"
   packages = ["."]
   pruneopts = "T"
-  revision = "a62a804a8a009876ca59105f7899938a1349f4b3"
-  version = "v1.0"
-
-[[projects]]
-  digest = "1:da65c8f6365ddb7f33efd6a0de4e0fbc934873b84106663c96ceb978764d5d86"
-  name = "github.com/rs/xhandler"
-  packages = ["."]
-  pruneopts = "T"
-  revision = "d9d9599b6aaf6a058cb7b1f48291ded2cbd13390"
-  version = "v1.0"
+  revision = "3fb1b69b103a84de38a19c3c6ec073dd6caa4d3f"
+  version = "v1.5.0"
 
 [[projects]]
   branch = "master"
@@ -133,17 +131,17 @@
   revision = "5295e8364332db77d75fce11f1d19c053919a9c9"
 
 [[projects]]
-  digest = "1:448c05a00f8b3be27061bd6344358d152f942309137ab4d330336d1d780715c9"
+  branch = "master"
+  digest = "1:2f32d0c33fdedffa0a388f4efece40ac66445c64c79ed48361c320e177e63562"
   name = "golang.org/x/net"
   packages = [
-    "context",
     "html",
     "html/atom",
     "html/charset",
     "websocket",
   ]
   pruneopts = "T"
-  revision = "a6577fac2d73be281a500b310739095313165611"
+  revision = "4dfa2610cdf3b287375bbba5b8f2a14d3b01d8de"
 
 [[projects]]
   branch = "master"
@@ -197,7 +195,9 @@
     "github.com/ethereum/go-ethereum/common/math",
     "github.com/ethereum/go-ethereum/crypto",
     "github.com/ethereum/go-ethereum/crypto/ecies",
+    "github.com/ethereum/go-ethereum/event",
     "github.com/ethereum/go-ethereum/log",
+    "github.com/ethereum/go-ethereum/metrics",
     "github.com/ethereum/go-ethereum/p2p",
     "github.com/ethereum/go-ethereum/p2p/discover",
     "github.com/ethereum/go-ethereum/p2p/nat",
