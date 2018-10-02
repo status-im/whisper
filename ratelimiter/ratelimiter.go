@@ -1,20 +1,16 @@
 package ratelimiter
 
 import (
-	"encoding/binary"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/juju/ratelimit"
-	"github.com/status-im/status-go/db"
 	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/opt"
 )
 
-// Interface describes common interface methods.
+// Interface describes common ratelimiter methods.
 type Interface interface {
 	Create([]byte) error
 	Remove([]byte, time.Duration) error
@@ -22,13 +18,6 @@ type Interface interface {
 	Available([]byte) int64
 	UpdateConfig([]byte, Config) error
 	Config() Config
-}
-
-// DBInterface defines leveldb methods used by ratelimiter.
-type DBInterface interface {
-	Put(key, value []byte, wo *opt.WriteOptions) error
-	Get(key []byte, ro *opt.ReadOptions) (value []byte, err error)
-	Delete(key []byte, wo *opt.WriteOptions) error
 }
 
 // Config is a set of options used by rate limiter.
@@ -46,12 +35,11 @@ func newBucket(c Config) *ratelimit.Bucket {
 	return ratelimit.NewBucketWithQuantum(time.Duration(c.Interval), int64(c.Capacity), int64(c.Quantum))
 }
 
-func NewPersisted(db DBInterface, config Config, prefix []byte) *PersistedRateLimiter {
+func NewPersisted(db DBInterface, config Config) *PersistedRateLimiter {
 	return &PersistedRateLimiter{
 		db:            db,
 		defaultConfig: config,
 		initialized:   map[string]*ratelimit.Bucket{},
-		prefix:        prefix,
 		timeFunc:      time.Now,
 	}
 }
@@ -59,7 +47,6 @@ func NewPersisted(db DBInterface, config Config, prefix []byte) *PersistedRateLi
 // PersistedRateLimiter persists latest capacity and updated config per unique ID.
 type PersistedRateLimiter struct {
 	db            DBInterface
-	prefix        []byte // TODO move prefix outside of the rate limiter using database interface
 	defaultConfig Config
 
 	mu          sync.Mutex
@@ -69,10 +56,11 @@ type PersistedRateLimiter struct {
 }
 
 func (r *PersistedRateLimiter) blacklist(id []byte, duration time.Duration) error {
-	fkey := db.Key(db.RateLimitBlacklist, r.prefix, id)
-	buf := [8]byte{}
-	binary.BigEndian.PutUint64(buf[:], uint64(r.timeFunc().Add(duration).Unix()))
-	if err := r.db.Put(fkey, buf[:], nil); err != nil {
+	if duration == 0 {
+		return nil
+	}
+	record := BlacklistRecord{ID: id, Deadline: r.timeFunc().Add(duration)}
+	if err := record.Write(r.db); err != nil {
 		return fmt.Errorf("error blacklisting %x: %v", id, err)
 	}
 	return nil
@@ -96,39 +84,19 @@ func (r *PersistedRateLimiter) getOrCreate(id []byte, config Config) (bucket *ra
 }
 
 func (r *PersistedRateLimiter) Create(id []byte) error {
-	fkey := db.Key(db.RateLimitBlacklist, r.prefix, id)
-	val, err := r.db.Get(fkey, nil)
-	if err != leveldb.ErrNotFound {
-		deadline := binary.BigEndian.Uint64(val)
-		if deadline >= uint64(r.timeFunc().Unix()) {
+	bl := BlacklistRecord{ID: id}
+	if err := bl.Read(r.db); err != leveldb.ErrNotFound {
+		if bl.Deadline.After(r.timeFunc()) {
 			return fmt.Errorf("identity %x is blacklisted", id)
 		}
-		r.db.Delete(fkey, nil)
+		bl.Remove(r.db)
 	}
-	fkey = db.Key(db.RateLimitConfig, r.prefix, id)
-	val, err = r.db.Get(fkey, nil)
-	var cfg Config
-	if err == leveldb.ErrNotFound {
-		cfg = r.defaultConfig
-	} else if err != nil {
-		log.Error("faield to read config from db. using default", "err", err)
-		cfg = r.defaultConfig
-	} else {
-		if err := rlp.DecodeBytes(val, &cfg); err != nil {
-			log.Error("failed to decode config. using default", "err", err)
-			cfg = r.defaultConfig
-		}
-	}
-	bucket := r.getOrCreate(id, cfg)
-	fkey = db.Key(db.RateLimitCapacity, r.prefix, id)
-	val, err = r.db.Get(fkey, nil)
-	if err == leveldb.ErrNotFound {
-		return nil
-	} else if len(val) != 16 {
-		log.Error("stored value is of unexpected length", "expected", 8, "stored", len(val))
+	bucket := r.getOrCreate(id, r.defaultConfig)
+	capacity := CapacityRecord{ID: id}
+	if err := capacity.Read(r.db); err != nil {
 		return nil
 	}
-	bucket.TakeAvailable(int64(binary.BigEndian.Uint64(val[:8])))
+	bucket.TakeAvailable(capacity.Taken)
 	// TODO refill rate limiter due to time difference. e.g. if record was stored at T and C seconds passed since T.
 	// we need to add RATE_PER_SECOND*C to a bucket
 	return nil
@@ -152,11 +120,12 @@ func (r *PersistedRateLimiter) Remove(id []byte, duration time.Duration) error {
 }
 
 func (r *PersistedRateLimiter) store(id []byte, bucket *ratelimit.Bucket) error {
-	buf := [16]byte{}
-	binary.BigEndian.PutUint64(buf[:], uint64(bucket.Capacity()-bucket.Available()))
-	binary.BigEndian.PutUint64(buf[8:], uint64(r.timeFunc().Unix()))
-	err := r.db.Put(db.Key(db.RateLimitCapacity, r.prefix, id), buf[:], nil)
-	if err != nil {
+	capacity := CapacityRecord{
+		ID:        id,
+		Taken:     bucket.Capacity() - bucket.Available(),
+		Timestamp: r.timeFunc(),
+	}
+	if err := capacity.Write(r.db); err != nil {
 		return fmt.Errorf("failed to write current capacicity %d for id %x: %v",
 			bucket.Capacity(), id, err)
 	}
@@ -190,12 +159,5 @@ func (r *PersistedRateLimiter) UpdateConfig(id []byte, config Config) error {
 		taken = old.Capacity() - old.Available()
 	}
 	r.getOrCreate(id, config).TakeAvailable(taken)
-	fkey := db.Key(db.RateLimitConfig, r.prefix, id)
-	data, err := rlp.EncodeToBytes(config)
-	if err != nil {
-		log.Error("failed to update config", "cfg", config, "err", err)
-		return nil
-	}
-	r.db.Put(fkey, data, nil)
 	return nil
 }

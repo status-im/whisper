@@ -15,7 +15,7 @@ func TestLimitIsPersisted(t *testing.T) {
 	require.NoError(t, err)
 	var (
 		total int64 = 10000
-		rl          = NewPersisted(db, Config{1 << 62, uint64(10000), 1}, nil)
+		rl          = NewPersisted(db, Config{1 << 62, uint64(10000), 1})
 		tid         = []byte("test")
 	)
 	require.NoError(t, rl.Create(tid))
@@ -26,13 +26,13 @@ func TestLimitIsPersisted(t *testing.T) {
 	require.Equal(t, total/2, rl.Available(tid))
 }
 
-func TestConfigIsPersistedAndFixedOnUpdate(t *testing.T) {
+func TestConfigFixedOnUpdate(t *testing.T) {
 	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	require.NoError(t, err)
 	var (
 		total int64 = 10000
 		cfg         = Config{1 << 62, uint64(10000), 1}
-		rl          = NewPersisted(db, cfg, nil)
+		rl          = NewPersisted(db, cfg)
 		tid         = []byte("test")
 	)
 	require.NoError(t, rl.Create(tid))
@@ -41,9 +41,6 @@ func TestConfigIsPersistedAndFixedOnUpdate(t *testing.T) {
 	cfg.Capacity = 6000
 	require.NoError(t, rl.UpdateConfig(tid, cfg))
 	require.Equal(t, int64(cfg.Capacity)-total/2, rl.Available(tid))
-	require.NoError(t, rl.Remove(tid, 0))
-	require.NoError(t, rl.Create(tid))
-	require.Equal(t, int64(cfg.Capacity)-total/2, rl.Available(tid))
 }
 
 func TestBlacklistedEntityReturnsError(t *testing.T) {
@@ -51,7 +48,7 @@ func TestBlacklistedEntityReturnsError(t *testing.T) {
 	require.NoError(t, err)
 	var (
 		cfg = Config{1 << 62, uint64(10000), 1}
-		rl  = NewPersisted(db, cfg, nil)
+		rl  = NewPersisted(db, cfg)
 		tid = []byte("test")
 	)
 	require.NoError(t, rl.Create(tid))

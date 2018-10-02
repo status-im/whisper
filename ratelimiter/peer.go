@@ -77,8 +77,8 @@ type Whisper struct {
 
 func ForWhisper(mode int, db DBInterface, ingress, egress Config) Whisper {
 	return Whisper{
-		ingress: NewP2PRateLimiter(mode, NewPersisted(db, ingress, []byte("i"))),
-		egress:  NewP2PRateLimiter(mode, NewPersisted(db, egress, []byte("e"))),
+		ingress: NewP2PRateLimiter(mode, NewPersisted(WithPrefix(db, []byte("i")), ingress)),
+		egress:  NewP2PRateLimiter(mode, NewPersisted(WithPrefix(db, []byte("e")), egress)),
 	}
 }
 
