@@ -21,7 +21,7 @@ const (
 	testCode = 42 // any non-defined code will work
 )
 
-func setupOneConnection(t *testing.T, rlconf ratelimiter.Config) (*Whisper, *p2p.MsgPipeRW, chan error) {
+func setupOneConnection(t *testing.T, rlconf ratelimiter.Config, egressConf ratelimiter.Config) (*Whisper, *p2p.MsgPipeRW, chan error) {
 	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	require.NoError(t, err)
 	rl := ratelimiter.ForWhisper(ratelimiter.IDMode, db, rlconf, rlconf)
@@ -42,14 +42,13 @@ func setupOneConnection(t *testing.T, rlconf ratelimiter.Config) (*Whisper, *p2p
 	require.NoError(t, err)
 	require.Equal(t, uint64(0), msg.Code)
 	require.NoError(t, msg.Discard())
-	require.NoError(t, p2p.SendItems(rw1, statusCode, ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), true))
-	require.NoError(t, p2p.ExpectMsg(rw1, peerRateLimitCode, nil), "peer must send ingress rate limit after handshake")
+	require.NoError(t, p2p.SendItems(rw1, statusCode, ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), true, &egressConf))
 	return w, rw1, errorc
 }
 
 func TestRatePeerDropsConnection(t *testing.T) {
 	cfg := ratelimiter.Config{Interval: uint64(time.Hour), Capacity: 10 << 10, Quantum: 1 << 10}
-	_, rw1, errorc := setupOneConnection(t, cfg)
+	_, rw1, errorc := setupOneConnection(t, cfg, cfg)
 
 	require.NoError(t, p2p.Send(rw1, testCode, make([]byte, 11<<10))) // limit is 1024
 	select {
@@ -62,7 +61,8 @@ func TestRatePeerDropsConnection(t *testing.T) {
 
 func TestRateLimitedDelivery(t *testing.T) {
 	cfg := ratelimiter.Config{Interval: uint64(time.Hour), Capacity: 10 << 10, Quantum: 1 << 10}
-	w, rw1, _ := setupOneConnection(t, cfg)
+	ecfg := ratelimiter.Config{Interval: uint64(time.Hour), Capacity: 1 << 10, Quantum: 1 << 10}
+	w, rw1, _ := setupOneConnection(t, cfg, ecfg)
 	small1 := Envelope{
 		Expiry: uint32(time.Now().Add(10 * time.Second).Unix()),
 		TTL:    10,
@@ -72,6 +72,7 @@ func TestRateLimitedDelivery(t *testing.T) {
 	}
 	small2 := small1
 	small2.Nonce = 2
+	small2.Data = make([]byte, 3<<10)
 	big := small1
 	big.Nonce = 3
 	big.Data = make([]byte, 11<<10)
@@ -91,7 +92,7 @@ func TestRateLimitedDelivery(t *testing.T) {
 		msg, err := rw1.ReadMsg()
 		if err == p2p.ErrPipeClosed {
 			require.Contains(t, received, small1.Hash())
-			require.Contains(t, received, small2.Hash())
+			require.NotContains(t, received, small2.Hash())
 			require.NotContains(t, received, big.Hash())
 			break
 		}
@@ -107,9 +108,9 @@ func TestRateLimitedDelivery(t *testing.T) {
 
 func TestRateRandomizedDelivery(t *testing.T) {
 	cfg := ratelimiter.Config{Interval: uint64(time.Hour), Capacity: 10 << 10, Quantum: 1 << 10}
-	w1, rw1, _ := setupOneConnection(t, cfg)
-	w2, rw2, _ := setupOneConnection(t, cfg)
-	w3, rw3, _ := setupOneConnection(t, cfg)
+	w1, rw1, _ := setupOneConnection(t, cfg, cfg)
+	w2, rw2, _ := setupOneConnection(t, cfg, cfg)
+	w3, rw3, _ := setupOneConnection(t, cfg, cfg)
 	var (
 		mu       sync.Mutex
 		wg       sync.WaitGroup

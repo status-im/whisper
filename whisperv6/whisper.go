@@ -768,13 +768,6 @@ func (whisper *Whisper) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 		delete(whisper.peers, whisperPeer)
 		whisper.peerMu.Unlock()
 	}()
-
-	// Run the peer handshake and state updates
-	if err := whisperPeer.handshake(); err != nil {
-		return err
-	}
-	whisperPeer.start()
-	defer whisperPeer.stop()
 	if whisper.ratelimiter != nil {
 		if err := whisper.ratelimiter.I().Create(whisperPeer.peer); err != nil {
 			return err
@@ -783,6 +776,13 @@ func (whisper *Whisper) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 		whisper.ratelimiter.E().Create(whisperPeer.peer)
 		defer whisper.ratelimiter.E().Remove(whisperPeer.peer, 0)
 	}
+
+	// Run the peer handshake and state updates
+	if err := whisperPeer.handshake(); err != nil {
+		return err
+	}
+	whisperPeer.start()
+	defer whisperPeer.stop()
 	return whisper.runMessageLoop(whisperPeer, rw)
 }
 
@@ -798,9 +798,6 @@ func (whisper *Whisper) advertiseEgressLimit(p *Peer, rw p2p.MsgReadWriter) erro
 
 // runMessageLoop reads and processes inbound messages directly to merge into client-global state.
 func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
-	if err := whisper.advertiseEgressLimit(p, rw); err != nil {
-		return err
-	}
 	for {
 		// fetch the next packet
 		packet, err := rw.ReadMsg()
@@ -955,7 +952,8 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 		packet.Discard()
 
 		if packet.Code != p2pMessageCode && whisper.ratelimiter != nil {
-			if whisper.ratelimiter.I().TakeAvailable(p.peer, int64(packet.Size)) < int64(packet.Size) {
+			// TODO 300 should be a quantum size
+			if whisper.ratelimiter.I().TakeAvailable(p.peer, int64(packet.Size))+300 < int64(packet.Size) {
 				whisper.ratelimiter.I().Remove(p.peer, 10*time.Minute)
 				return fmt.Errorf("peer %v reached traffic limit capacity", p.peer.ID())
 			}

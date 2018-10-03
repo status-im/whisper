@@ -28,6 +28,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/status-im/whisper/ratelimiter"
 )
 
 // Peer represents a whisper protocol peer connection.
@@ -82,12 +83,17 @@ func (peer *Peer) handshake() error {
 	errc := make(chan error, 1)
 	isLightNode := peer.host.LightClientMode()
 	isRestrictedLightNodeConnection := peer.host.LightClientModeConnectionRestricted()
+	var rlCfg *ratelimiter.Config
+	if peer.host.ratelimiter != nil {
+		tmp := peer.host.ratelimiter.I().Config()
+		rlCfg = &tmp
+	}
 	go func() {
 		pow := peer.host.MinPow()
 		powConverted := math.Float64bits(pow)
 		bloom := peer.host.BloomFilter()
 
-		errc <- p2p.SendItems(peer.ws, statusCode, ProtocolVersion, powConverted, bloom, isLightNode)
+		errc <- p2p.SendItems(peer.ws, statusCode, ProtocolVersion, powConverted, bloom, isLightNode, rlCfg)
 	}()
 
 	// Fetch the remote status packet and verify protocol match
@@ -134,6 +140,13 @@ func (peer *Peer) handshake() error {
 	isRemotePeerLightNode, err := s.Bool()
 	if isRemotePeerLightNode && isLightNode && isRestrictedLightNodeConnection {
 		return fmt.Errorf("peer [%x] is useless: two light client communication restricted", peer.ID())
+	}
+
+	egressCfg := ratelimiter.Config{}
+	if err := s.Decode(&egressCfg); err == nil {
+		if peer.host.ratelimiter != nil {
+			peer.host.ratelimiter.E().UpdateConfig(peer.peer, egressCfg)
+		}
 	}
 
 	if err := <-errc; err != nil {
