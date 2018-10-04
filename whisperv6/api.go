@@ -230,6 +230,17 @@ type newMessageOverride struct {
 // Post posts a message on the Whisper network.
 // returns the hash of the message in case of success.
 func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (hexutil.Bytes, error) {
+
+	env, err := api.CreateEnvelope(ctx, req)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return api.PostRaw(ctx, env, req.TargetPeer)
+}
+
+func (api *PublicWhisperAPI) CreateEnvelope(ctx context.Context, req NewMessage) (*Envelope, error) {
 	var (
 		symKeyGiven = len(req.SymKeyID) > 0
 		pubKeyGiven = len(req.PublicKey) > 0
@@ -283,15 +294,24 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (hexutil.
 		return nil, err
 	}
 
-	var result []byte
 	env, err := whisperMsg.Wrap(params, api.w.GetCurrentTime())
 	if err != nil {
 		return nil, err
 	}
 
+	// ensure that the message PoW meets the node's minimum accepted PoW
+	if len(req.TargetPeer) == 0 && req.PowTarget < api.w.MinPow() {
+		return nil, ErrTooLowPoW
+	}
+
+	return env, nil
+}
+
+func (api *PublicWhisperAPI) PostRaw(ctx context.Context, env *Envelope, targetPeer string) (hexutil.Bytes, error) {
+	var result []byte
 	// send to specific node (skip PoW check)
-	if len(req.TargetPeer) > 0 {
-		n, err := discover.ParseNode(req.TargetPeer)
+	if len(targetPeer) > 0 {
+		n, err := discover.ParseNode(targetPeer)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse target peer: %s", err)
 		}
@@ -303,16 +323,13 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (hexutil.
 		return result, err
 	}
 
-	// ensure that the message PoW meets the node's minimum accepted PoW
-	if req.PowTarget < api.w.MinPow() {
-		return nil, ErrTooLowPoW
-	}
+	err := api.w.Send(env)
 
-	err = api.w.Send(env)
 	if err == nil {
 		hash := env.Hash()
 		result = hash[:]
 	}
+
 	return result, err
 }
 
