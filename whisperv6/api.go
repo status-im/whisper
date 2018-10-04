@@ -240,6 +240,8 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (hexutil.
 	return api.PostRaw(ctx, env, req.TargetPeer)
 }
 
+// CreateEnvelope creates, signs and returns an envelope.
+// returns the envelope in case of success
 func (api *PublicWhisperAPI) CreateEnvelope(ctx context.Context, req NewMessage) (*Envelope, error) {
 	var (
 		symKeyGiven = len(req.SymKeyID) > 0
@@ -307,6 +309,8 @@ func (api *PublicWhisperAPI) CreateEnvelope(ctx context.Context, req NewMessage)
 	return env, nil
 }
 
+// PostRaw posts the existing envelope to the network
+// returns the hash of the message on success
 func (api *PublicWhisperAPI) PostRaw(ctx context.Context, env *Envelope, targetPeer string) (hexutil.Bytes, error) {
 	var result []byte
 	// send to specific node (skip PoW check)
