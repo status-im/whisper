@@ -21,10 +21,10 @@ const (
 	testCode = 42 // any non-defined code will work
 )
 
-func setupOneConnection(t *testing.T, rlconf ratelimiter.Config, egressConf ratelimiter.Config) (*Whisper, *p2p.MsgPipeRW, chan error) {
+func setupOneConnection(t *testing.T, rlconf, egressConf *ratelimiter.Config) (*Whisper, *p2p.MsgPipeRW, chan error) {
 	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	require.NoError(t, err)
-	rl := ratelimiter.ForWhisper(ratelimiter.IDMode, db, rlconf)
+	rl := ratelimiter.ForWhisper(ratelimiter.IDMode, db, *rlconf)
 	conf := &Config{
 		MinimumAcceptedPOW: 0,
 		MaxMessageSize:     100 << 10,
@@ -36,7 +36,8 @@ func setupOneConnection(t *testing.T, rlconf ratelimiter.Config, egressConf rate
 	rw1, rw2 := p2p.MsgPipe()
 	errorc := make(chan error, 1)
 	go func() {
-		errorc <- w.HandlePeer(p, rw2)
+		err := w.HandlePeer(p, rw2)
+		errorc <- err
 	}()
 	require.NoError(t, p2p.ExpectMsg(rw1, statusCode, []interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, rlconf}))
 	require.NoError(t, p2p.SendItems(rw1, statusCode, ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), true, egressConf))
@@ -44,7 +45,7 @@ func setupOneConnection(t *testing.T, rlconf ratelimiter.Config, egressConf rate
 }
 
 func TestRatePeerDropsConnection(t *testing.T) {
-	cfg := ratelimiter.Config{Interval: uint64(time.Hour), Capacity: 10 << 10, Quantum: 1 << 10}
+	cfg := &ratelimiter.Config{Interval: uint64(time.Hour), Capacity: 10 << 10, Quantum: 1 << 10}
 	_, rw1, errorc := setupOneConnection(t, cfg, cfg)
 
 	require.NoError(t, p2p.Send(rw1, testCode, make([]byte, 11<<10))) // limit is 1024
@@ -57,54 +58,89 @@ func TestRatePeerDropsConnection(t *testing.T) {
 }
 
 func TestRateLimitedDelivery(t *testing.T) {
-	cfg := ratelimiter.Config{Interval: uint64(time.Hour), Capacity: 10 << 10, Quantum: 1 << 10}
-	ecfg := ratelimiter.Config{Interval: uint64(time.Hour), Capacity: 2 << 10, Quantum: 1 << 10}
-	w, rw1, _ := setupOneConnection(t, cfg, ecfg)
-	small1 := Envelope{
-		Expiry: uint32(time.Now().Add(10 * time.Second).Unix()),
-		TTL:    10,
-		Topic:  TopicType{1},
-		Data:   make([]byte, 1<<10),
-		Nonce:  1,
+	cfg := &ratelimiter.Config{Interval: uint64(time.Hour), Capacity: 10 << 10, Quantum: 1 << 10}
+	type testCase struct {
+		description string
+		cfg         *ratelimiter.Config
+		received    []uint64
+		notReceived []uint64
 	}
-	small2 := small1
-	small2.Nonce = 2
-	small2.Data = make([]byte, 3<<10)
-	big := small1
-	big.Nonce = 3
-	big.Data = make([]byte, 11<<10)
+	for _, tc := range []testCase{
+		{
+			description: "NoEgress",
+			received:    []uint64{1, 2, 3},
+		},
+		{
+			description: "EgressSmallerThanIngress",
+			received:    []uint64{1},
+			notReceived: []uint64{2, 3},
+			cfg:         &ratelimiter.Config{Interval: uint64(time.Hour), Capacity: 2 << 10, Quantum: 1 << 10},
+		},
+		{
+			description: "EgressSameAsIngress",
+			received:    []uint64{1, 2},
+			notReceived: []uint64{3},
+			cfg:         cfg,
+		},
+	} {
+		tc := tc
+		t.Run(tc.description, func(t *testing.T) {
+			t.Parallel()
+			small1 := Envelope{
+				Expiry: uint32(time.Now().Add(10 * time.Second).Unix()),
+				TTL:    10,
+				Topic:  TopicType{1},
+				Data:   make([]byte, 1<<10),
+				Nonce:  1,
+			}
+			rand.Read(small1.Data)
+			small2 := small1
+			small2.Nonce = 2
+			small2.Data = make([]byte, 3<<10)
+			rand.Read(small2.Data)
+			big := small1
+			big.Nonce = 3
+			big.Data = make([]byte, 11<<10)
+			rand.Read(big.Data)
 
-	require.NoError(t, w.Send(&small1))
-	require.NoError(t, w.Send(&big))
-	require.NoError(t, w.Send(&small2))
+			w, rw1, _ := setupOneConnection(t, cfg, tc.cfg)
 
-	received := map[common.Hash]struct{}{}
-	// we can not guarantee that all expected envelopes will be delivered in a one batch
-	// so allow whisper to write multiple times and read every message
-	go func() {
-		time.Sleep(time.Second)
-		rw1.Close()
-	}()
-	for {
-		msg, err := rw1.ReadMsg()
-		if err == p2p.ErrPipeClosed {
-			require.Contains(t, received, small1.Hash())
-			require.NotContains(t, received, small2.Hash())
-			require.NotContains(t, received, big.Hash())
-			break
-		}
-		require.NoError(t, err)
-		require.Equal(t, uint64(1), msg.Code)
-		var rst []*Envelope
-		require.NoError(t, msg.Decode(&rst))
-		for _, e := range rst {
-			received[e.Hash()] = struct{}{}
-		}
+			require.NoError(t, w.Send(&small1))
+			require.NoError(t, w.Send(&big))
+			require.NoError(t, w.Send(&small2))
+
+			received := map[uint64]struct{}{}
+			// we can not guarantee that all expected envelopes will be delivered in a one batch
+			// so allow whisper to write multiple times and read every message
+			go func() {
+				time.Sleep(3 * time.Second)
+				rw1.Close()
+			}()
+			for {
+				msg, err := rw1.ReadMsg()
+				if err == p2p.ErrPipeClosed {
+					for _, n := range tc.received {
+						require.Contains(t, received, n)
+					}
+					for _, n := range tc.notReceived {
+						require.NotContains(t, received, n)
+					}
+					break
+				}
+				require.NoError(t, err)
+				require.Equal(t, messagesCode, int(msg.Code))
+				var rst []*Envelope
+				require.NoError(t, msg.Decode(&rst))
+				for _, e := range rst {
+					received[e.Nonce] = struct{}{}
+				}
+			}
+		})
 	}
 }
 
 func TestRateRandomizedDelivery(t *testing.T) {
-	cfg := ratelimiter.Config{Interval: uint64(time.Hour), Capacity: 10 << 10, Quantum: 1 << 10}
+	cfg := &ratelimiter.Config{Interval: uint64(time.Hour), Capacity: 10 << 10, Quantum: 1 << 10}
 	w1, rw1, _ := setupOneConnection(t, cfg, cfg)
 	w2, rw2, _ := setupOneConnection(t, cfg, cfg)
 	w3, rw3, _ := setupOneConnection(t, cfg, cfg)
