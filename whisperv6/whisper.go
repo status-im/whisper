@@ -769,12 +769,11 @@ func (whisper *Whisper) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 		whisper.peerMu.Unlock()
 	}()
 	if whisper.ratelimiter != nil {
-		if err := whisper.ratelimiter.I().Create(whisperPeer.peer); err != nil {
+		if err := whisper.ratelimiter.I.Create(whisperPeer.peer, whisper.ratelimiter.Config); err != nil {
 			return err
 		}
-		defer whisper.ratelimiter.I().Remove(whisperPeer.peer, 0)
-		whisper.ratelimiter.E().Create(whisperPeer.peer)
-		defer whisper.ratelimiter.E().Remove(whisperPeer.peer, 0)
+		defer whisper.ratelimiter.I.Remove(whisperPeer.peer, 0)
+		defer whisper.ratelimiter.E.Remove(whisperPeer.peer, 0)
 	}
 
 	// Run the peer handshake and state updates
@@ -790,7 +789,7 @@ func (whisper *Whisper) advertiseEgressLimit(p *Peer, rw p2p.MsgReadWriter) erro
 	if whisper.ratelimiter == nil {
 		return nil
 	}
-	if err := p2p.Send(rw, peerRateLimitCode, whisper.ratelimiter.I().Config()); err != nil {
+	if err := p2p.Send(rw, peerRateLimitCode, whisper.ratelimiter.Config); err != nil {
 		return fmt.Errorf("failed to send ingress rate limit to a peer %v: %v", p.peer.ID(), err)
 	}
 	return nil
@@ -886,17 +885,6 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 
 				whisper.mailServer.DeliverMail(p, &request)
 			}
-		case peerRateLimitCode:
-			if whisper.ratelimiter == nil {
-				continue
-			}
-			var conf ratelimiter.Config
-			if err := packet.Decode(&conf); err != nil {
-				return fmt.Errorf("peer %v sent wrong payload for a rate limiter config", p.peer.ID())
-			}
-			if err := whisper.ratelimiter.E().UpdateConfig(p.peer, conf); err != nil {
-				log.Error("error updaing rate limiter config", "peer", p.peer)
-			}
 		case p2pRequestCompleteCode:
 			if p.trusted {
 				var payload []byte
@@ -953,8 +941,8 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 
 		if packet.Code != p2pMessageCode && whisper.ratelimiter != nil {
 			// TODO 300 should be a quantum size
-			if whisper.ratelimiter.I().TakeAvailable(p.peer, int64(packet.Size))+300 < int64(packet.Size) {
-				whisper.ratelimiter.I().Remove(p.peer, 10*time.Minute)
+			if whisper.ratelimiter.I.TakeAvailable(p.peer, int64(packet.Size))+300 < int64(packet.Size) {
+				whisper.ratelimiter.I.Remove(p.peer, 10*time.Minute)
 				return fmt.Errorf("peer %v reached traffic limit capacity", p.peer.ID())
 			}
 		}

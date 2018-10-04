@@ -2,6 +2,7 @@ package ratelimiter
 
 import (
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -12,12 +13,10 @@ import (
 
 // Interface describes common ratelimiter methods.
 type Interface interface {
-	Create([]byte) error
+	Create([]byte, Config) error
 	Remove([]byte, time.Duration) error
 	TakeAvailable([]byte, int64) int64
 	Available([]byte) int64
-	UpdateConfig([]byte, Config) error
-	Config() Config
 }
 
 // Config is a set of options used by rate limiter.
@@ -35,19 +34,18 @@ func newBucket(c Config) *ratelimit.Bucket {
 	return ratelimit.NewBucketWithQuantum(time.Duration(c.Interval), int64(c.Capacity), int64(c.Quantum))
 }
 
-func NewPersisted(db DBInterface, config Config) *PersistedRateLimiter {
+// NewPersisted returns instance of rate limiter with persisted black listed records and capacity before peer was removed.
+func NewPersisted(db DBInterface) *PersistedRateLimiter {
 	return &PersistedRateLimiter{
-		db:            db,
-		defaultConfig: config,
-		initialized:   map[string]*ratelimit.Bucket{},
-		timeFunc:      time.Now,
+		db:          db,
+		initialized: map[string]*ratelimit.Bucket{},
+		timeFunc:    time.Now,
 	}
 }
 
 // PersistedRateLimiter persists latest capacity and updated config per unique ID.
 type PersistedRateLimiter struct {
-	db            DBInterface
-	defaultConfig Config
+	db DBInterface
 
 	mu          sync.Mutex
 	initialized map[string]*ratelimit.Bucket
@@ -66,26 +64,15 @@ func (r *PersistedRateLimiter) blacklist(id []byte, duration time.Duration) erro
 	return nil
 }
 
-// Config returns default config.
-func (r *PersistedRateLimiter) Config() Config {
-	return r.defaultConfig
-}
-
-func (r *PersistedRateLimiter) getOrCreate(id []byte, config Config) (bucket *ratelimit.Bucket) {
+func (r *PersistedRateLimiter) get(id []byte) (bucket *ratelimit.Bucket, exist bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	old, exist := r.initialized[string(id)]
-	if !exist {
-		bucket = newBucket(config)
-		r.initialized[string(id)] = bucket
-	} else {
-		bucket = old
-	}
+	bucket, exist = r.initialized[string(id)]
 	return
 }
 
 // Create creates an instance for a provided ID. If ID was blacklisted error is returned.
-func (r *PersistedRateLimiter) Create(id []byte) error {
+func (r *PersistedRateLimiter) Create(id []byte, cfg Config) error {
 	bl := BlacklistRecord{ID: id}
 	if err := bl.Read(r.db); err != leveldb.ErrNotFound {
 		if bl.Deadline.After(r.timeFunc()) {
@@ -93,7 +80,10 @@ func (r *PersistedRateLimiter) Create(id []byte) error {
 		}
 		bl.Remove(r.db)
 	}
-	bucket := r.getOrCreate(id, r.defaultConfig)
+	bucket := newBucket(cfg)
+	r.mu.Lock()
+	r.initialized[string(id)] = bucket
+	r.mu.Unlock()
 	capacity := CapacityRecord{ID: id}
 	if err := capacity.Read(r.db); err != nil {
 		return nil
@@ -136,7 +126,10 @@ func (r *PersistedRateLimiter) store(id []byte, bucket *ratelimit.Bucket) error 
 
 // TakeAvailable subtracts requested amount from a rate limiter with ID.
 func (r *PersistedRateLimiter) TakeAvailable(id []byte, count int64) int64 {
-	bucket := r.getOrCreate(id, r.defaultConfig)
+	bucket, exist := r.get(id)
+	if !exist {
+		return math.MaxInt64
+	}
 	rst := bucket.TakeAvailable(count)
 	if err := r.store(id, bucket); err != nil {
 		log.Error(err.Error())
@@ -144,25 +137,11 @@ func (r *PersistedRateLimiter) TakeAvailable(id []byte, count int64) int64 {
 	return rst
 }
 
-// TakeAvailable peeks into available amount with a given ID.
+// Available peeks into available amount with a given ID.
 func (r *PersistedRateLimiter) Available(id []byte) int64 {
-	return r.getOrCreate(id, r.defaultConfig).Available()
-}
-
-// UpdateConfig updates config for a provided ID.
-func (r *PersistedRateLimiter) UpdateConfig(id []byte, config Config) error {
-	r.mu.Lock()
-	old, _ := r.initialized[string(id)]
-	if compare(config, old) {
-		r.mu.Unlock()
-		return nil
+	bucket, exist := r.get(id)
+	if !exist {
+		return math.MaxInt64
 	}
-	delete(r.initialized, string(id))
-	r.mu.Unlock()
-	taken := int64(0)
-	if old != nil {
-		taken = old.Capacity() - old.Available()
-	}
-	r.getOrCreate(id, config).TakeAvailable(taken)
-	return nil
+	return bucket.Available()
 }

@@ -24,7 +24,7 @@ const (
 func setupOneConnection(t *testing.T, rlconf ratelimiter.Config, egressConf ratelimiter.Config) (*Whisper, *p2p.MsgPipeRW, chan error) {
 	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	require.NoError(t, err)
-	rl := ratelimiter.ForWhisper(ratelimiter.IDMode, db, rlconf, rlconf)
+	rl := ratelimiter.ForWhisper(ratelimiter.IDMode, db, rlconf)
 	conf := &Config{
 		MinimumAcceptedPOW: 0,
 		MaxMessageSize:     100 << 10,

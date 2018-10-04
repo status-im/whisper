@@ -85,8 +85,7 @@ func (peer *Peer) handshake() error {
 	isRestrictedLightNodeConnection := peer.host.LightClientModeConnectionRestricted()
 	var rlCfg *ratelimiter.Config
 	if peer.host.ratelimiter != nil {
-		tmp := peer.host.ratelimiter.I().Config()
-		rlCfg = &tmp
+		rlCfg = &peer.host.ratelimiter.Config
 	}
 	go func() {
 		pow := peer.host.MinPow()
@@ -143,10 +142,8 @@ func (peer *Peer) handshake() error {
 	}
 
 	egressCfg := ratelimiter.Config{}
-	if err := s.Decode(&egressCfg); err == nil {
-		if peer.host.ratelimiter != nil {
-			peer.host.ratelimiter.E().UpdateConfig(peer.peer, egressCfg)
-		}
+	if err := s.Decode(&egressCfg); err == nil && peer.host.ratelimiter != nil {
+		peer.host.ratelimiter.E.Create(peer.peer, egressCfg)
 	}
 
 	if err := <-errc; err != nil {
@@ -215,10 +212,10 @@ func (peer *Peer) reduceBundle(bundle []*Envelope) []*Envelope {
 	})
 	for i := range bundle {
 		size := int64(bundle[i].size())
-		if peer.host.ratelimiter.E().Available(peer.peer) < size {
+		if peer.host.ratelimiter.E.Available(peer.peer) < size {
 			return bundle[:i]
 		}
-		peer.host.ratelimiter.E().TakeAvailable(peer.peer, size)
+		peer.host.ratelimiter.E.TakeAvailable(peer.peer, size)
 	}
 	return bundle
 }

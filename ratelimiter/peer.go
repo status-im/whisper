@@ -47,14 +47,9 @@ type P2PRateLimiter struct {
 	ratelimiter Interface
 }
 
-// Config returns default configuration used for a particular rate limiter.
-func (r P2PRateLimiter) Config() Config {
-	return r.ratelimiter.Config()
-}
-
 // Create instantiates rate limiter with for a peer.
-func (r P2PRateLimiter) Create(peer *p2p.Peer) error {
-	return r.ratelimiter.Create(r.modeFunc(peer))
+func (r P2PRateLimiter) Create(peer *p2p.Peer, cfg Config) error {
+	return r.ratelimiter.Create(r.modeFunc(peer), cfg)
 }
 
 // Remove drops peer from in-memory rate limiter. If duration is non-zero peer will be blacklisted.
@@ -72,30 +67,17 @@ func (r P2PRateLimiter) Available(peer *p2p.Peer) int64 {
 	return r.ratelimiter.Available(r.modeFunc(peer))
 }
 
-// UpdateConfig update capacity and rate for the given peer.
-func (r P2PRateLimiter) UpdateConfig(peer *p2p.Peer, config Config) error {
-	return r.ratelimiter.UpdateConfig(r.modeFunc(peer), config)
-}
-
 // Whisper is a convenience wrapper for whisper.
 type Whisper struct {
-	ingress, egress P2PRateLimiter
+	I, E   P2PRateLimiter
+	Config Config
 }
 
 // ForWhisper returns a convenient wrapper to be used in whisper.
-func ForWhisper(mode int, db DBInterface, ingress, egress Config) Whisper {
+func ForWhisper(mode int, db DBInterface, ingress Config) Whisper {
 	return Whisper{
-		ingress: NewP2PRateLimiter(mode, NewPersisted(WithPrefix(db, []byte("i")), ingress)),
-		egress:  NewP2PRateLimiter(mode, NewPersisted(WithPrefix(db, []byte("e")), egress)),
+		I:      NewP2PRateLimiter(mode, NewPersisted(WithPrefix(db, []byte("i")))),
+		E:      NewP2PRateLimiter(mode, NewPersisted(WithPrefix(db, []byte("e")))),
+		Config: ingress,
 	}
-}
-
-// I returns instance of p2p rate limiter for ingress traffic.
-func (w Whisper) I() P2PRateLimiter {
-	return w.ingress
-}
-
-// E returns instance of p2p rate limiter egress traffic.
-func (w Whisper) E() P2PRateLimiter {
-	return w.egress
 }
