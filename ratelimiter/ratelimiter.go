@@ -66,6 +66,7 @@ func (r *PersistedRateLimiter) blacklist(id []byte, duration time.Duration) erro
 	return nil
 }
 
+// Config returns default config.
 func (r *PersistedRateLimiter) Config() Config {
 	return r.defaultConfig
 }
@@ -83,6 +84,7 @@ func (r *PersistedRateLimiter) getOrCreate(id []byte, config Config) (bucket *ra
 	return
 }
 
+// Create creates an instance for a provided ID. If ID was blacklisted error is returned.
 func (r *PersistedRateLimiter) Create(id []byte) error {
 	bl := BlacklistRecord{ID: id}
 	if err := bl.Read(r.db); err != leveldb.ErrNotFound {
@@ -132,6 +134,7 @@ func (r *PersistedRateLimiter) store(id []byte, bucket *ratelimit.Bucket) error 
 	return nil
 }
 
+// TakeAvailable subtracts requested amount from a rate limiter with ID.
 func (r *PersistedRateLimiter) TakeAvailable(id []byte, count int64) int64 {
 	bucket := r.getOrCreate(id, r.defaultConfig)
 	rst := bucket.TakeAvailable(count)
@@ -141,10 +144,12 @@ func (r *PersistedRateLimiter) TakeAvailable(id []byte, count int64) int64 {
 	return rst
 }
 
+// TakeAvailable peeks into available amount with a given ID.
 func (r *PersistedRateLimiter) Available(id []byte) int64 {
 	return r.getOrCreate(id, r.defaultConfig).Available()
 }
 
+// UpdateConfig updates config for a provided ID.
 func (r *PersistedRateLimiter) UpdateConfig(id []byte, config Config) error {
 	r.mu.Lock()
 	old, _ := r.initialized[string(id)]

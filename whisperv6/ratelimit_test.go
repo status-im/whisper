@@ -38,11 +38,8 @@ func setupOneConnection(t *testing.T, rlconf ratelimiter.Config, egressConf rate
 	go func() {
 		errorc <- w.HandlePeer(p, rw2)
 	}()
-	msg, err := rw1.ReadMsg()
-	require.NoError(t, err)
-	require.Equal(t, uint64(0), msg.Code)
-	require.NoError(t, msg.Discard())
-	require.NoError(t, p2p.SendItems(rw1, statusCode, ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), true, &egressConf))
+	require.NoError(t, p2p.ExpectMsg(rw1, statusCode, []interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, rlconf}))
+	require.NoError(t, p2p.SendItems(rw1, statusCode, ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), true, egressConf))
 	return w, rw1, errorc
 }
 
@@ -61,7 +58,7 @@ func TestRatePeerDropsConnection(t *testing.T) {
 
 func TestRateLimitedDelivery(t *testing.T) {
 	cfg := ratelimiter.Config{Interval: uint64(time.Hour), Capacity: 10 << 10, Quantum: 1 << 10}
-	ecfg := ratelimiter.Config{Interval: uint64(time.Hour), Capacity: 1 << 10, Quantum: 1 << 10}
+	ecfg := ratelimiter.Config{Interval: uint64(time.Hour), Capacity: 2 << 10, Quantum: 1 << 10}
 	w, rw1, _ := setupOneConnection(t, cfg, ecfg)
 	small1 := Envelope{
 		Expiry: uint32(time.Now().Add(10 * time.Second).Unix()),
