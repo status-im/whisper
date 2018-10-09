@@ -37,8 +37,8 @@ func TestBlacklistedEntityReturnsError(t *testing.T) {
 	)
 	require.NoError(t, rl.Create(tid, cfg))
 	require.NoError(t, rl.Remove(tid, 10*time.Minute))
-	require.EqualError(t, fmt.Errorf("identity %x is blacklisted", tid), rl.Create(tid, cfg).Error())
-	rl.timeFunc = func() time.Time {
+	require.EqualError(t, fmt.Errorf("identity %#x is blacklisted", tid), rl.Create(tid, cfg).Error())
+	rl.now = func() time.Time {
 		return time.Now().Add(11 * time.Minute)
 	}
 	require.NoError(t, rl.Create(tid, cfg))

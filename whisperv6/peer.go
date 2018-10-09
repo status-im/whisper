@@ -142,7 +142,7 @@ func (peer *Peer) handshake() error {
 
 	egressCfg := ratelimiter.Config{}
 	if err := s.Decode(&egressCfg); err == nil && peer.host.ratelimiter != nil {
-		peer.host.ratelimiter.E.Create(peer.peer, egressCfg)
+		peer.host.ratelimiter.Egress.Create(peer.peer, egressCfg)
 	}
 	if err := <-errc; err != nil {
 		return fmt.Errorf("peer [%x] failed to send status packet: %v", peer.ID(), err)
@@ -207,10 +207,10 @@ func (peer *Peer) reduceBundle(bundle []*Envelope) []*Envelope {
 	}
 	for i := range bundle {
 		size := int64(bundle[i].size())
-		if peer.host.ratelimiter.E.Available(peer.peer) < size {
+		if peer.host.ratelimiter.Egress.Available(peer.peer) < size {
 			return bundle[:i]
 		}
-		peer.host.ratelimiter.E.TakeAvailable(peer.peer, size)
+		peer.host.ratelimiter.Egress.TakeAvailable(peer.peer, size)
 	}
 	return bundle
 }

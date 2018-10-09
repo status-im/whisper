@@ -60,7 +60,7 @@ type BlacklistRecord struct {
 	Deadline time.Time
 }
 
-// Key reurns unique identifier with blacklist delimiter.
+// Key returns unique identifier with blacklist delimiter.
 func (r BlacklistRecord) Key() []byte {
 	key := make([]byte, len(r.ID)+1)
 	key[0] = BlacklistBucket

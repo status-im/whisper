@@ -93,15 +93,12 @@ func TestRateLimitedDelivery(t *testing.T) {
 				Data:   make([]byte, 1<<10),
 				Nonce:  1,
 			}
-			rand.Read(small1.Data)
 			small2 := small1
 			small2.Nonce = 2
 			small2.Data = make([]byte, 3<<10)
-			rand.Read(small2.Data)
 			big := small1
 			big.Nonce = 3
 			big.Data = make([]byte, 11<<10)
-			rand.Read(big.Data)
 
 			w, rw1, _ := setupOneConnection(t, cfg, tc.cfg)
 

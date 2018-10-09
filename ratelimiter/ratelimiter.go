@@ -24,12 +24,6 @@ type Config struct {
 	Interval, Capacity, Quantum uint64
 }
 
-// compare config with existing ratelimited bucket.
-func compare(c Config, bucket *ratelimit.Bucket) bool {
-	return int64(c.Capacity) == bucket.Capacity() &&
-		1e9*float64(c.Quantum)/float64(c.Interval) == bucket.Rate()
-}
-
 func newBucket(c Config) *ratelimit.Bucket {
 	return ratelimit.NewBucketWithQuantum(time.Duration(c.Interval), int64(c.Capacity), int64(c.Quantum))
 }
@@ -39,7 +33,7 @@ func NewPersisted(db DBInterface) *PersistedRateLimiter {
 	return &PersistedRateLimiter{
 		db:          db,
 		initialized: map[string]*ratelimit.Bucket{},
-		timeFunc:    time.Now,
+		now:         time.Now,
 	}
 }
 
@@ -50,16 +44,16 @@ type PersistedRateLimiter struct {
 	mu          sync.Mutex
 	initialized map[string]*ratelimit.Bucket
 
-	timeFunc func() time.Time
+	now func() time.Time
 }
 
 func (r *PersistedRateLimiter) blacklist(id []byte, duration time.Duration) error {
 	if duration == 0 {
 		return nil
 	}
-	record := BlacklistRecord{ID: id, Deadline: r.timeFunc().Add(duration)}
+	record := BlacklistRecord{ID: id, Deadline: r.now().Add(duration)}
 	if err := record.Write(r.db); err != nil {
-		return fmt.Errorf("error blacklisting %x: %v", id, err)
+		return fmt.Errorf("error blacklisting %#x: %v", id, err)
 	}
 	return nil
 }
@@ -71,24 +65,35 @@ func (r *PersistedRateLimiter) get(id []byte) (bucket *ratelimit.Bucket, exist b
 	return
 }
 
-// Create creates an instance for a provided ID. If ID was blacklisted error is returned.
-func (r *PersistedRateLimiter) Create(id []byte, cfg Config) error {
+func (r *PersistedRateLimiter) isBlacklisted(id []byte) bool {
 	bl := BlacklistRecord{ID: id}
 	if err := bl.Read(r.db); err != leveldb.ErrNotFound {
-		if bl.Deadline.After(r.timeFunc()) {
-			return fmt.Errorf("identity %x is blacklisted", id)
+		if bl.Deadline.After(r.now()) {
+			return true
 		}
 		bl.Remove(r.db)
+	}
+	return false
+}
+
+func (r *PersistedRateLimiter) adjustBucket(bucket *ratelimit.Bucket, id []byte) {
+	capacity := CapacityRecord{ID: id}
+	if err := capacity.Read(r.db); err != nil {
+		return
+	}
+	bucket.TakeAvailable(capacity.Taken)
+}
+
+// Create creates an instance for a provided ID. If ID was blacklisted error is returned.
+func (r *PersistedRateLimiter) Create(id []byte, cfg Config) error {
+	if r.isBlacklisted(id) {
+		return fmt.Errorf("identity %#x is blacklisted", id)
 	}
 	bucket := newBucket(cfg)
 	r.mu.Lock()
 	r.initialized[string(id)] = bucket
 	r.mu.Unlock()
-	capacity := CapacityRecord{ID: id}
-	if err := capacity.Read(r.db); err != nil {
-		return nil
-	}
-	bucket.TakeAvailable(capacity.Taken)
+	r.adjustBucket(bucket, id)
 	// TODO refill rate limiter due to time difference. e.g. if record was stored at T and C seconds passed since T.
 	// we need to add RATE_PER_SECOND*C to a bucket
 	return nil
@@ -115,7 +120,7 @@ func (r *PersistedRateLimiter) store(id []byte, bucket *ratelimit.Bucket) error 
 	capacity := CapacityRecord{
 		ID:        id,
 		Taken:     bucket.Capacity() - bucket.Available(),
-		Timestamp: r.timeFunc(),
+		Timestamp: r.now(),
 	}
 	if err := capacity.Write(r.db); err != nil {
 		return fmt.Errorf("failed to write current capacicity %d for id %x: %v",

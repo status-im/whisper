@@ -769,11 +769,11 @@ func (whisper *Whisper) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 		whisper.peerMu.Unlock()
 	}()
 	if whisper.ratelimiter != nil {
-		if err := whisper.ratelimiter.I.Create(whisperPeer.peer, whisper.ratelimiter.Config); err != nil {
+		if err := whisper.ratelimiter.Ingress.Create(whisperPeer.peer, whisper.ratelimiter.Config); err != nil {
 			return err
 		}
-		defer whisper.ratelimiter.I.Remove(whisperPeer.peer, 0)
-		defer whisper.ratelimiter.E.Remove(whisperPeer.peer, 0)
+		defer whisper.ratelimiter.Ingress.Remove(whisperPeer.peer, 0)
+		defer whisper.ratelimiter.Egress.Remove(whisperPeer.peer, 0)
 	}
 
 	// Run the peer handshake and state updates
@@ -797,6 +797,7 @@ func (whisper *Whisper) advertiseEgressLimit(p *Peer, rw p2p.MsgReadWriter) erro
 
 // runMessageLoop reads and processes inbound messages directly to merge into client-global state.
 func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
+	blacklist := false
 	for {
 		// fetch the next packet
 		packet, err := rw.ReadMsg()
@@ -807,6 +808,12 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 		if packet.Size > whisper.MaxMessageSize() {
 			log.Warn("oversized message received", "peer", p.peer.ID())
 			return errors.New("oversized message received")
+		}
+
+		if packet.Code != p2pMessageCode && whisper.ratelimiter != nil {
+			if whisper.ratelimiter.Ingress.TakeAvailable(p.peer, int64(packet.Size))+300 < int64(packet.Size) {
+				blacklist = true
+			}
 		}
 
 		switch packet.Code {
@@ -939,12 +946,9 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 
 		packet.Discard()
 
-		if packet.Code != p2pMessageCode && whisper.ratelimiter != nil {
-			// TODO 300 should be a quantum size
-			if whisper.ratelimiter.I.TakeAvailable(p.peer, int64(packet.Size))+300 < int64(packet.Size) {
-				whisper.ratelimiter.I.Remove(p.peer, 10*time.Minute)
-				return fmt.Errorf("peer %v reached traffic limit capacity", p.peer.ID())
-			}
+		if blacklist {
+			whisper.ratelimiter.Ingress.Remove(p.peer, 10*time.Minute)
+			return fmt.Errorf("peer %v reached traffic limit capacity", p.peer.ID())
 		}
 	}
 }
