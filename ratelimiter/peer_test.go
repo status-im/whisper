@@ -19,7 +19,7 @@ func TestIDMode(t *testing.T) {
 	rl.EXPECT().TakeAvailable(peer.ID().Bytes(), int64(0))
 	rl.EXPECT().Available(peer.ID().Bytes())
 	rl.EXPECT().Remove(peer.ID().Bytes(), time.Duration(0))
-	peerrl := NewP2PRateLimiter(IDMode, rl)
+	peerrl := NewPeerRateLimiter(IDMode, rl)
 	require.NoError(t, peerrl.Create(peer, cfg))
 	peerrl.TakeAvailable(peer, 0)
 	peerrl.Available(peer)
