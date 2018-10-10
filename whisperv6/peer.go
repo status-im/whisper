@@ -140,6 +140,8 @@ func (peer *Peer) handshake() error {
 		return fmt.Errorf("peer [%x] is useless: two light client communication restricted", peer.ID())
 	}
 
+	// Decode received egress configuration from the peer. In case it's not defined,
+	// sending data to that peer won't be limited.
 	egressCfg := ratelimiter.Config{}
 	if err := s.Decode(&egressCfg); err == nil && peer.host.ratelimiter != nil {
 		peer.host.ratelimiter.Egress.Create(peer.peer, egressCfg)
@@ -229,6 +231,8 @@ func (peer *Peer) broadcast() error {
 			bundle = append(bundle, envelope)
 		}
 	}
+	// bundle will be reduce according to a rate limiter
+	// if rate limiter is nil - this operation is noop
 	bundle = peer.reduceBundle(bundle)
 	if len(bundle) > 0 {
 		// transmit the batch of envelopes

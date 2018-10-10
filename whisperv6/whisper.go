@@ -785,16 +785,6 @@ func (whisper *Whisper) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 	return whisper.runMessageLoop(whisperPeer, rw)
 }
 
-func (whisper *Whisper) advertiseEgressLimit(p *Peer, rw p2p.MsgReadWriter) error {
-	if whisper.ratelimiter == nil {
-		return nil
-	}
-	if err := p2p.Send(rw, peerRateLimitCode, whisper.ratelimiter.Config); err != nil {
-		return fmt.Errorf("failed to send ingress rate limit to a peer %v: %v", p.peer.ID(), err)
-	}
-	return nil
-}
-
 // runMessageLoop reads and processes inbound messages directly to merge into client-global state.
 func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 	blacklist := false

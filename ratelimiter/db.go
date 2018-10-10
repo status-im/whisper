@@ -32,7 +32,7 @@ type IsolatedDB struct {
 	prefix []byte
 }
 
-func (db IsolatedDB) withPrefix(key []byte) []byte {
+func (db IsolatedDB) keyWithPrefix(key []byte) []byte {
 	fkey := make([]byte, len(db.prefix)+len(key))
 	copy(fkey, db.prefix)
 	copy(fkey[len(db.prefix):], key)
@@ -41,17 +41,17 @@ func (db IsolatedDB) withPrefix(key []byte) []byte {
 
 // Put writes a value at the key location.
 func (db IsolatedDB) Put(key, value []byte, wo *opt.WriteOptions) error {
-	return db.db.Put(db.withPrefix(key), value, wo)
+	return db.db.Put(db.keyWithPrefix(key), value, wo)
 }
 
 // Get gets a value of key.
 func (db IsolatedDB) Get(key []byte, ro *opt.ReadOptions) (value []byte, err error) {
-	return db.db.Get(db.withPrefix(key), ro)
+	return db.db.Get(db.keyWithPrefix(key), ro)
 }
 
 // Delete record at the location of key.
 func (db IsolatedDB) Delete(key []byte, wo *opt.WriteOptions) error {
-	return db.db.Delete(db.withPrefix(key), wo)
+	return db.db.Delete(db.keyWithPrefix(key), wo)
 }
 
 // BlacklistRecord is a record with information of a deadline for a particular ID.

@@ -36,51 +36,51 @@ func selectFunc(mode int) modeFunc {
 	return byID
 }
 
-// NewP2PRateLimiter returns an instance of P2PRateLimiter.
-func NewP2PRateLimiter(mode int, ratelimiter Interface) P2PRateLimiter {
-	return P2PRateLimiter{
+// NewPeerRateLimiter returns an instance of PeerRateLimiter.
+func NewPeerRateLimiter(mode int, ratelimiter Interface) PeerRateLimiter {
+	return PeerRateLimiter{
 		getID:       selectFunc(mode),
 		ratelimiter: ratelimiter,
 	}
 }
 
-// P2PRateLimiter implements rate limiter that accepts p2p.Peer as identifier.
-type P2PRateLimiter struct {
+// PeerRateLimiter implements rate limiter that accepts p2p.Peer as identifier.
+type PeerRateLimiter struct {
 	getID       modeFunc
 	ratelimiter Interface
 }
 
 // Create instantiates rate limiter with for a peer.
-func (r P2PRateLimiter) Create(peer *p2p.Peer, cfg Config) error {
+func (r PeerRateLimiter) Create(peer *p2p.Peer, cfg Config) error {
 	return r.ratelimiter.Create(r.getID(peer), cfg)
 }
 
 // Remove drops peer from in-memory rate limiter. If duration is non-zero peer will be blacklisted.
-func (r P2PRateLimiter) Remove(peer *p2p.Peer, duration time.Duration) error {
+func (r PeerRateLimiter) Remove(peer *p2p.Peer, duration time.Duration) error {
 	return r.ratelimiter.Remove(r.getID(peer), duration)
 }
 
 // TakeAvailable subtracts given amount up to the available limit.
-func (r P2PRateLimiter) TakeAvailable(peer *p2p.Peer, count int64) int64 {
+func (r PeerRateLimiter) TakeAvailable(peer *p2p.Peer, count int64) int64 {
 	return r.ratelimiter.TakeAvailable(r.getID(peer), count)
 }
 
 // Available peeks into the current available limit.
-func (r P2PRateLimiter) Available(peer *p2p.Peer) int64 {
+func (r PeerRateLimiter) Available(peer *p2p.Peer) int64 {
 	return r.ratelimiter.Available(r.getID(peer))
 }
 
 // Whisper is a convenience wrapper for whisper.
 type Whisper struct {
-	Ingress, Egress P2PRateLimiter
+	Ingress, Egress PeerRateLimiter
 	Config          Config
 }
 
 // ForWhisper returns a convenient wrapper to be used in whisper.
 func ForWhisper(mode int, db DBInterface, ingress Config) Whisper {
 	return Whisper{
-		Ingress: NewP2PRateLimiter(mode, NewPersisted(WithPrefix(db, []byte("i")))),
-		Egress:  NewP2PRateLimiter(mode, NewPersisted(WithPrefix(db, []byte("e")))),
+		Ingress: NewPeerRateLimiter(mode, NewPersisted(WithPrefix(db, []byte("i")))),
+		Egress:  NewPeerRateLimiter(mode, NewPersisted(WithPrefix(db, []byte("e")))),
 		Config:  ingress,
 	}
 }
