@@ -58,28 +58,25 @@ func TestRatePeerDropsConnection(t *testing.T) {
 }
 
 func TestRateLimitedDelivery(t *testing.T) {
-	cfg := &ratelimiter.Config{Interval: uint64(time.Hour), Capacity: 10 << 10, Quantum: 1 << 10}
+	cfg := &ratelimiter.Config{Interval: uint64(time.Hour), Capacity: 3 << 10, Quantum: 1 << 10}
 	type testCase struct {
 		description string
 		cfg         *ratelimiter.Config
-		received    []uint64
-		notReceived []uint64
+		received    int
 	}
 	for _, tc := range []testCase{
 		{
 			description: "NoEgress",
-			received:    []uint64{1, 2, 3},
+			received:    3,
 		},
 		{
 			description: "EgressSmallerThanIngress",
-			received:    []uint64{1},
-			notReceived: []uint64{2, 3},
+			received:    1,
 			cfg:         &ratelimiter.Config{Interval: uint64(time.Hour), Capacity: 2 << 10, Quantum: 1 << 10},
 		},
 		{
 			description: "EgressSameAsIngress",
-			received:    []uint64{1, 2},
-			notReceived: []uint64{3},
+			received:    2,
 			cfg:         cfg,
 		},
 	} {
@@ -95,16 +92,14 @@ func TestRateLimitedDelivery(t *testing.T) {
 			}
 			small2 := small1
 			small2.Nonce = 2
-			small2.Data = make([]byte, 3<<10)
-			big := small1
-			big.Nonce = 3
-			big.Data = make([]byte, 11<<10)
+			small3 := small1
+			small3.Nonce = 3
 
 			w, rw1, _ := setupOneConnection(t, cfg, tc.cfg)
 
 			require.NoError(t, w.Send(&small1))
-			require.NoError(t, w.Send(&big))
 			require.NoError(t, w.Send(&small2))
+			require.NoError(t, w.Send(&small3))
 
 			received := map[uint64]struct{}{}
 			// we can not guarantee that all expected envelopes will be delivered in a one batch
@@ -116,12 +111,7 @@ func TestRateLimitedDelivery(t *testing.T) {
 			for {
 				msg, err := rw1.ReadMsg()
 				if err == p2p.ErrPipeClosed {
-					for _, n := range tc.received {
-						require.Contains(t, received, n)
-					}
-					for _, n := range tc.notReceived {
-						require.NotContains(t, received, n)
-					}
+					require.Len(t, received, tc.received)
 					break
 				}
 				require.NoError(t, err)
