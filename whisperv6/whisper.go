@@ -937,6 +937,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 		packet.Discard()
 
 		if blacklist {
+			peerBlacklistMeter.Mark(1)
 			whisper.ratelimiter.Ingress.Remove(p.peer, 10*time.Minute)
 			return fmt.Errorf("peer %v reached traffic limit capacity", p.peer.ID())
 		}

@@ -13,4 +13,6 @@ var (
 	envelopeErrLowPowCounter       = metrics.NewRegisteredCounter("whisper/envelopeErrLowPow", nil)
 	envelopeErrNoBloomMatchCounter = metrics.NewRegisteredCounter("whisper/envelopeErrNoBloomMatch", nil)
 	envelopeSizeMeter              = metrics.NewRegisteredMeter("whisper/envelopeSize", nil)
+	peerBundleRatio                = metrics.NewRegisteredGaugeFloat64("whisper/bundleRatio", nil)
+	peerBlacklistMeter             = metrics.NewRegisteredMeter("whisper/blacklistMeter", nil)
 )

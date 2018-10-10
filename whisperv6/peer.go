@@ -233,7 +233,9 @@ func (peer *Peer) broadcast() error {
 	}
 	// bundle will be reduce according to a rate limiter
 	// if rate limiter is nil - this operation is noop
+	original := len(bundle)
 	bundle = peer.reduceBundle(bundle)
+	peerBundleRatio.Update(float64(len(bundle)) / float64(original))
 	if len(bundle) > 0 {
 		// transmit the batch of envelopes
 		if err := p2p.Send(peer.ws, messagesCode, bundle); err != nil {
