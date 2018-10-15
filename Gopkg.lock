@@ -3,19 +3,19 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:40a3716965c1e46688a3290d8043f5bbdfbcb218e4c1327384049a7ec2df92e0"
+  digest = "1:495c7006c2f48b705f0d89fd8449a2ae70622bb748788d9d17caafa65a6769f9"
   name = "github.com/aristanetworks/goarista"
   packages = ["monotime"]
   pruneopts = "T"
-  revision = "ff33da284e760fcdb03c33d37a719e5ed30ba844"
+  revision = "33151c4543a79b013e8e6799ef45b2ba88c3cd1c"
 
 [[projects]]
   branch = "master"
-  digest = "1:e599801f29de116faca9d3c1937c0f03c7629de72dab7365684179068d2cd315"
+  digest = "1:0bd9f11575e82b723837f50e170d010ec29a50aa8ca02a962c439146f03aea55"
   name = "github.com/btcsuite/btcd"
   packages = ["btcec"]
   pruneopts = "T"
-  revision = "2a560b2036bee5e3679ec2133eb6520b2f195213"
+  revision = "67e573d211ace594f1366b4ce9d39726c4b19bd0"
 
 [[projects]]
   digest = "1:e47d51dab652d26c3fba6f8cba403f922d02757a82abdc77e90df7948daf296e"
@@ -26,17 +26,21 @@
   version = "v1.7.1"
 
 [[projects]]
-  digest = "1:cf53a6be6cf3d947c0c7fb678237a7b34e06e4102411ecb843eedacb46759995"
+  digest = "1:1dc638d013f2a6f6ae13568584e8fee7e172cbf295e82064ded18bcf6d63c04c"
   name = "github.com/ethereum/go-ethereum"
   packages = [
+    ".",
     "common",
     "common/hexutil",
     "common/math",
     "common/mclock",
+    "common/prque",
+    "core/types",
     "crypto",
     "crypto/ecies",
     "crypto/secp256k1",
     "crypto/sha3",
+    "ethdb",
     "event",
     "log",
     "metrics",
@@ -45,11 +49,14 @@
     "p2p/discv5",
     "p2p/nat",
     "p2p/netutil",
+    "params",
     "rlp",
     "rpc",
+    "trie",
+    "whisper/whisperv6",
   ]
   pruneopts = "T"
-  revision = "56c2fa69e0224e8f939a092b3aba20b23bb95c26"
+  revision = "31f0afca344c53678e98032d6306e0e4ff7b9be1"
   source = "github.com/status-im/go-ethereum"
   version = "v1.8.16"
 
@@ -70,8 +77,7 @@
   revision = "2e65f85255dbc3072edf28d6b5b8efc472979f5a"
 
 [[projects]]
-  branch = "master"
-  digest = "1:202e4a1a283dd740ca9d131787e73bb9d69611a01ef86e82ed262e035b0dd792"
+  digest = "1:a33cc2e4fb12c58430d2aae5834ff6e84cb609da97692e1fe2aa0cd5ebc92623"
   name = "github.com/huin/goupnp"
   packages = [
     ".",
@@ -83,7 +89,8 @@
     "ssdp",
   ]
   pruneopts = "T"
-  revision = "1395d1447324cbea88d249fbfcfd70ea878fdfca"
+  revision = "656e61dfadd241c7cbdd22a023fa81ecb6860ea8"
+  version = "v1.0.0"
 
 [[projects]]
   digest = "1:32b82e71cf24f8b78323e0d7903c4b90278486283965aa2a19b1ea13763b8f34"
@@ -94,16 +101,16 @@
   version = "v1.0.1"
 
 [[projects]]
-  digest = "1:6cae6970d70fc5fe75bf83c48ee33e9c4c561a62d0b033254bee8dd5942b815a"
+  digest = "1:a8a03bca5a81878daa4958136f3372af00437c61129ca088a430b0b786b9378a"
   name = "github.com/rs/cors"
   packages = ["."]
   pruneopts = "T"
-  revision = "3fb1b69b103a84de38a19c3c6ec073dd6caa4d3f"
-  version = "v1.5.0"
+  revision = "9a47f48565a795472d43519dd49aac781f3034fb"
+  version = "v1.6.0"
 
 [[projects]]
   branch = "master"
-  digest = "1:ee395d0d8c1719b5a1407f34af93953b4763bacb19a8961aba5b6d312824da41"
+  digest = "1:ea4a45f31f55c7a42ba3063baa646ac94eb7ee9afe60c1fd2c8b396930222620"
   name = "github.com/syndtr/goleveldb"
   packages = [
     "leveldb",
@@ -120,19 +127,19 @@
     "leveldb/util",
   ]
   pruneopts = "T"
-  revision = "ae2bd5eed72d46b28834ec3f60db3a3ebedd8dbd"
+  revision = "6b91fda63f2e36186f1c9d0e48578defb69c5d43"
 
 [[projects]]
   branch = "master"
-  digest = "1:95ad8eba44d70efb03988715aac94031241bfd7c06432748aabb4a8963b65f08"
+  digest = "1:56a43b9f51e5c5ea734e866b82d57c842b022c795a0611ff5f57f3d7c47de45d"
   name = "golang.org/x/crypto"
   packages = ["pbkdf2"]
   pruneopts = "T"
-  revision = "5295e8364332db77d75fce11f1d19c053919a9c9"
+  revision = "0c41d7ab0a0ee717d4590a44bcb987dfd9e183eb"
 
 [[projects]]
   branch = "master"
-  digest = "1:2f32d0c33fdedffa0a388f4efece40ac66445c64c79ed48361c320e177e63562"
+  digest = "1:7af83e18e72aae0cc57d28c8c441654695491af7c58df20ac3af43b500f651a8"
   name = "golang.org/x/net"
   packages = [
     "html",
@@ -141,7 +148,7 @@
     "websocket",
   ]
   pruneopts = "T"
-  revision = "4dfa2610cdf3b287375bbba5b8f2a14d3b01d8de"
+  revision = "49bb7cea24b1df9410e1712aa6433dae904ff66a"
 
 [[projects]]
   branch = "master"
@@ -190,6 +197,7 @@
   analyzer-version = 1
   input-imports = [
     "github.com/deckarep/golang-set",
+    "github.com/ethereum/go-ethereum",
     "github.com/ethereum/go-ethereum/common",
     "github.com/ethereum/go-ethereum/common/hexutil",
     "github.com/ethereum/go-ethereum/common/math",
@@ -203,6 +211,7 @@
     "github.com/ethereum/go-ethereum/p2p/nat",
     "github.com/ethereum/go-ethereum/rlp",
     "github.com/ethereum/go-ethereum/rpc",
+    "github.com/ethereum/go-ethereum/whisper/whisperv6",
     "github.com/syndtr/goleveldb/leveldb/errors",
     "golang.org/x/crypto/pbkdf2",
     "golang.org/x/sync/syncmap",
