@@ -922,9 +922,7 @@ func TestSendP2PDirect(t *testing.T) {
 		t.Fatalf("failed Wrap with seed %d: %s.", seed, err)
 	}
 
-	// check sent envelopes
-	var envelopes []*Envelope
-
+	// verify sending a single envelope
 	err = w.SendP2PDirect(peerW, env)
 	if err != nil {
 		t.Fatalf("failed to send envelope with seed %d: %s.", seed, err)
@@ -932,14 +930,14 @@ func TestSendP2PDirect(t *testing.T) {
 	if len(rwStub.messages) != 1 {
 		t.Fatalf("invalid number of messages sent to peer: %d, expected 1", len(rwStub.messages))
 	}
-	if err := rwStub.messages[0].Decode(&envelopes); err != nil {
+	var envelope Envelope
+	if err := rwStub.messages[0].Decode(&envelope); err != nil {
 		t.Fatalf("failed to decode envelopes: %s", err)
 	}
-	if len(envelopes) != 1 {
-		t.Fatalf("invalid number of envelopes in a message: %d, expected 1", len(envelopes))
+	if envelope.Hash() != env.Hash() {
+		t.Fatalf("invalid envelope %d, expected %d", envelope.Hash(), env.Hash())
 	}
 	rwStub.messages = nil
-	envelopes = nil
 
 	// send a batch of envelopes
 	err = w.SendP2PDirect(peerW, env, env, env)
@@ -949,6 +947,7 @@ func TestSendP2PDirect(t *testing.T) {
 	if len(rwStub.messages) != 1 {
 		t.Fatalf("invalid number of messages sent to peer: %d, expected 1", len(rwStub.messages))
 	}
+	var envelopes []*Envelope
 	if err := rwStub.messages[0].Decode(&envelopes); err != nil {
 		t.Fatalf("failed to decode envelopes: %s", err)
 	}

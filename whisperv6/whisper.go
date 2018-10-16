@@ -429,7 +429,13 @@ func (whisper *Whisper) SendP2PMessage(peerID []byte, envelopes ...*Envelope) er
 }
 
 // SendP2PDirect sends a peer-to-peer message to a specific peer.
+// If only a single envelope is given, data is sent as a single object
+// rather than a slice. This is important to keep this method backward compatible
+// as it used to send only single envelopes.
 func (whisper *Whisper) SendP2PDirect(peer *Peer, envelopes ...*Envelope) error {
+	if len(envelopes) == 1 {
+		return p2p.Send(peer.ws, p2pMessageCode, envelopes[0])
+	}
 	return p2p.Send(peer.ws, p2pMessageCode, envelopes)
 }
 
