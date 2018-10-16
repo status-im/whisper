@@ -851,34 +851,31 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					err       error
 				)
 
-				// Duplicate the stream because we will attempt to read twice from it
-				// in case the first read fails.
-				var buf bytes.Buffer
-				packet.Payload = io.TeeReader(packet.Payload, &buf)
+				// Read all data as we will try to decode it possibly twice
+				// to keep backward compatibility.
+				data, err := ioutil.ReadAll(packet.Payload)
+				if err != nil {
+					return fmt.Errorf("invalid direct messages: %v", err)
+				}
+				r := bytes.NewReader(data)
+
+				packet.Payload = r
 
 				if err = packet.Decode(&envelopes); err == nil {
 					for _, envelope := range envelopes {
 						whisper.postEvent(envelope, true)
 					}
 					continue
-				} else {
-					// @TODO(adam): figure out if this is needed. io.TeeReader docs say
-					// it does not copy data to writer if it was not read.
-					// It might happen that packet.Decode() won't read all data
-					// and exit earlier, hence, we need to make sure all data is read.
-					// To avoid it, it should be possible to write a custom struct that
-					// implements io.Reader, starts reading from a buffer and switches to
-					// a reader when the whole buffer is read.
-					if _, err := ioutil.ReadAll(packet.Payload); err != nil {
-						return fmt.Errorf("invalid direct messages: %v", err)
-					}
 				}
 
-				// The first read failed but we can use buffer as a Reader
-				// to read the same data again.
-				packet.Payload = &buf
+				// As we failed to decode envelopes, let's set the offset
+				// to the beginning and try decode data again.
+				// Decoding to a single Envelope is required
+				// to be backward compatible.
+				if _, err := r.Seek(0, io.SeekStart); err != nil {
+					return fmt.Errorf("invalid direct messages: %v", err)
+				}
 
-				// In order to be backward compatible, try to parse a single envelope as well.
 				if err = packet.Decode(&envelope); err == nil {
 					whisper.postEvent(envelope, true)
 					continue
