@@ -21,6 +21,8 @@ import (
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"math"
 	"runtime"
 	"sync"
@@ -418,17 +420,17 @@ func (whisper *Whisper) SendHistoricMessageResponse(peer *Peer, payload []byte) 
 }
 
 // SendP2PMessage sends a peer-to-peer message to a specific peer.
-func (whisper *Whisper) SendP2PMessage(peerID []byte, envelope *Envelope) error {
+func (whisper *Whisper) SendP2PMessage(peerID []byte, envelopes ...*Envelope) error {
 	p, err := whisper.getPeer(peerID)
 	if err != nil {
 		return err
 	}
-	return whisper.SendP2PDirect(p, envelope)
+	return whisper.SendP2PDirect(p, envelopes...)
 }
 
 // SendP2PDirect sends a peer-to-peer message to a specific peer.
-func (whisper *Whisper) SendP2PDirect(peer *Peer, envelope *Envelope) error {
-	return p2p.Send(peer.ws, p2pMessageCode, envelope)
+func (whisper *Whisper) SendP2PDirect(peer *Peer, envelopes ...*Envelope) error {
+	return p2p.Send(peer.ws, p2pMessageCode, envelopes)
 }
 
 // NewKeyPair generates a new cryptographic identity for the client, and injects
@@ -843,12 +845,49 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 			// therefore might not satisfy the PoW, expiry and other requirements.
 			// these messages are only accepted from the trusted peer.
 			if p.trusted {
-				var envelope Envelope
-				if err := packet.Decode(&envelope); err != nil {
-					log.Warn("failed to decode direct message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
-					return errors.New("invalid direct message")
+				var (
+					envelope  *Envelope
+					envelopes []*Envelope
+					err       error
+				)
+
+				// Duplicate the stream because we will attempt to read twice from it
+				// in case the first read fails.
+				var buf bytes.Buffer
+				packet.Payload = io.TeeReader(packet.Payload, &buf)
+
+				if err = packet.Decode(&envelopes); err == nil {
+					for _, envelope := range envelopes {
+						whisper.postEvent(envelope, true)
+					}
+					continue
+				} else {
+					// @TODO(adam): figure out if this is needed. io.TeeReader docs say
+					// does not copy data to writer if it was not read.
+					// It might happen that packet.Decode() won't read all data
+					// and exit earlier, hence, we need to make sure all data is read.
+					// To avoid it, it should be possible to write a custom struct that
+					// implements io.Reader, starts reading from a buffer and switches to
+					// a reader when the whole buffer is read.
+					if _, err := ioutil.ReadAll(packet.Payload); err != nil {
+						return fmt.Errorf("invalid direct messages: %v", err)
+					}
 				}
-				whisper.postEvent(&envelope, true)
+
+				// The first read failed but we can use buffer as a Reader
+				// to read the same data again.
+				packet.Payload = &buf
+
+				// In order to be backward compatible, try to parse a single envelope as well.
+				if err = packet.Decode(&envelope); err == nil {
+					whisper.postEvent(envelope, true)
+					continue
+				}
+
+				if err != nil {
+					log.Warn("failed to decode direct message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
+					return fmt.Errorf("invalid direct message: %v", err)
+				}
 			}
 		case p2pRequestCode:
 			// Must be processed if mail server is implemented. Otherwise ignore.

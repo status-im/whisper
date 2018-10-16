@@ -25,6 +25,10 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/syndtr/goleveldb/leveldb/errors"
 	"golang.org/x/crypto/pbkdf2"
 )
 
@@ -889,4 +893,147 @@ func TestBloom(t *testing.T) {
 	if !BloomFilterMatch(f, x) || !BloomFilterMatch(x, f) {
 		t.Fatalf("retireved wrong bloom filter")
 	}
+}
+
+func TestSendP2PDirect(t *testing.T) {
+	InitSingleTest()
+
+	w := New(&DefaultConfig)
+	w.SetMinimumPowTest(0.0000001)
+	defer w.SetMinimumPowTest(DefaultMinimumPoW)
+	w.Start(nil)
+	defer w.Stop()
+
+	rwStub := &rwP2PMessagesStub{}
+	peerW := newPeer(w, p2p.NewPeer(discover.NodeID{}, "test", []p2p.Cap{}), rwStub)
+
+	params, err := generateMessageParams()
+	if err != nil {
+		t.Fatalf("failed generateMessageParams with seed %d: %s.", seed, err)
+	}
+	params.TTL = 1
+
+	msg, err := NewSentMessage(params)
+	if err != nil {
+		t.Fatalf("failed to create new message with seed %d: %s.", seed, err)
+	}
+	env, err := msg.Wrap(params, time.Now())
+	if err != nil {
+		t.Fatalf("failed Wrap with seed %d: %s.", seed, err)
+	}
+
+	// check sent envelopes
+	var envelopes []*Envelope
+
+	err = w.SendP2PDirect(peerW, env)
+	if err != nil {
+		t.Fatalf("failed to send envelope with seed %d: %s.", seed, err)
+	}
+	if len(rwStub.messages) != 1 {
+		t.Fatalf("invalid number of messages sent to peer: %d, expected 1", len(rwStub.messages))
+	}
+	if err := rwStub.messages[0].Decode(&envelopes); err != nil {
+		t.Fatalf("failed to decode envelopes: %s", err)
+	}
+	if len(envelopes) != 1 {
+		t.Fatalf("invalid number of envelopes in a message: %d, expected 1", len(envelopes))
+	}
+	rwStub.messages = nil
+	envelopes = nil
+
+	// send a batch of envelopes
+	err = w.SendP2PDirect(peerW, env, env, env)
+	if err != nil {
+		t.Fatalf("failed to send envelope with seed %d: %s.", seed, err)
+	}
+	if len(rwStub.messages) != 1 {
+		t.Fatalf("invalid number of messages sent to peer: %d, expected 1", len(rwStub.messages))
+	}
+	if err := rwStub.messages[0].Decode(&envelopes); err != nil {
+		t.Fatalf("failed to decode envelopes: %s", err)
+	}
+	if len(envelopes) != 3 {
+		t.Fatalf("invalid number of envelopes in a message: %d, expected 3", len(envelopes))
+	}
+	rwStub.messages = nil
+	envelopes = nil
+}
+
+func TestHandleP2PMessageCode(t *testing.T) {
+	InitSingleTest()
+
+	w := New(&DefaultConfig)
+	w.SetMinimumPowTest(0.0000001)
+	defer w.SetMinimumPowTest(DefaultMinimumPoW)
+	w.Start(nil)
+	defer w.Stop()
+
+	envelopeEvents := make(chan EnvelopeEvent, 10)
+	sub := w.SubscribeEnvelopeEvents(envelopeEvents)
+	defer sub.Unsubscribe()
+
+	params, err := generateMessageParams()
+	if err != nil {
+		t.Fatalf("failed generateMessageParams with seed %d: %s.", seed, err)
+	}
+	params.TTL = 1
+
+	msg, err := NewSentMessage(params)
+	if err != nil {
+		t.Fatalf("failed to create new message with seed %d: %s.", seed, err)
+	}
+	env, err := msg.Wrap(params, time.Now())
+	if err != nil {
+		t.Fatalf("failed Wrap with seed %d: %s.", seed, err)
+	}
+
+	// send a single envelope
+	rwStub := &rwP2PMessagesStub{}
+	rwStub.payload = []interface{}{env}
+
+	peer := newPeer(nil, p2p.NewPeer(discover.NodeID{}, "test", []p2p.Cap{}), nil)
+	peer.trusted = true
+
+	err = w.runMessageLoop(peer, rwStub)
+	if err != nil && err != errRWStub {
+		t.Fatalf("failed run message loop: %s", err)
+	}
+	if e := <-envelopeEvents; e.Hash != env.Hash() {
+		t.Fatalf("received envelope %s while expected %s", e.Hash, env.Hash())
+	}
+
+	// send a batch of envelopes
+	rwStub = &rwP2PMessagesStub{}
+	rwStub.payload = []interface{}{[]*Envelope{env, env, env}}
+
+	err = w.runMessageLoop(peer, rwStub)
+	if err != nil && err != errRWStub {
+		t.Fatalf("failed run message loop: %s", err)
+	}
+}
+
+var errRWStub = errors.New("no more messages")
+
+type rwP2PMessagesStub struct {
+	// payload stores individual messages that will be sent returned
+	// on ReadMsg() class
+	payload  []interface{}
+	messages []p2p.Msg
+}
+
+func (stub *rwP2PMessagesStub) ReadMsg() (p2p.Msg, error) {
+	if len(stub.payload) == 0 {
+		return p2p.Msg{}, errRWStub
+	}
+	size, r, err := rlp.EncodeToReader(stub.payload[0])
+	if err != nil {
+		return p2p.Msg{}, err
+	}
+	stub.payload = stub.payload[1:]
+	return p2p.Msg{Code: p2pMessageCode, Size: uint32(size), Payload: r}, nil
+}
+
+func (stub *rwP2PMessagesStub) WriteMsg(m p2p.Msg) error {
+	stub.messages = append(stub.messages, m)
+	return nil
 }
