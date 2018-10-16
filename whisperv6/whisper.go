@@ -863,7 +863,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					continue
 				} else {
 					// @TODO(adam): figure out if this is needed. io.TeeReader docs say
-					// does not copy data to writer if it was not read.
+					// it does not copy data to writer if it was not read.
 					// It might happen that packet.Decode() won't read all data
 					// and exit earlier, hence, we need to make sure all data is read.
 					// To avoid it, it should be possible to write a custom struct that

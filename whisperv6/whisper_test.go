@@ -987,7 +987,7 @@ func TestHandleP2PMessageCode(t *testing.T) {
 		t.Fatalf("failed Wrap with seed %d: %s.", seed, err)
 	}
 
-	// send a single envelope
+	// read a single envelope
 	rwStub := &rwP2PMessagesStub{}
 	rwStub.payload = []interface{}{env}
 
@@ -1002,13 +1002,18 @@ func TestHandleP2PMessageCode(t *testing.T) {
 		t.Fatalf("received envelope %s while expected %s", e.Hash, env.Hash())
 	}
 
-	// send a batch of envelopes
+	// read a batch of envelopes
 	rwStub = &rwP2PMessagesStub{}
 	rwStub.payload = []interface{}{[]*Envelope{env, env, env}}
 
 	err = w.runMessageLoop(peer, rwStub)
 	if err != nil && err != errRWStub {
 		t.Fatalf("failed run message loop: %s", err)
+	}
+	for i := 0; i < 3; i++ {
+		if e := <-envelopeEvents; e.Hash != env.Hash() {
+			t.Fatalf("received envelope %s while expected %s", e.Hash, env.Hash())
+		}
 	}
 }
 
