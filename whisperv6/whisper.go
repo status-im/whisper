@@ -34,6 +34,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/syndtr/goleveldb/leveldb/errors"
@@ -757,8 +758,17 @@ func (whisper *Whisper) Stop() error {
 // HandlePeer is called by the underlying P2P layer when the whisper sub-protocol
 // connection is negotiated.
 func (whisper *Whisper) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
+	return whisper.HandleConnection(peer, rw)
+}
+
+type Connection interface {
+	ID() discover.NodeID
+	IsFlaky() bool
+}
+
+func (whisper *Whisper) HandleConnection(conn Connection, rw p2p.MsgReadWriter) error {
 	// Create the new peer and start tracking it
-	whisperPeer := newPeer(whisper, peer, rw)
+	whisperPeer := newPeer(whisper, conn, rw)
 
 	whisper.peerMu.Lock()
 	whisper.peers[whisperPeer] = struct{}{}
@@ -769,14 +779,12 @@ func (whisper *Whisper) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 		delete(whisper.peers, whisperPeer)
 		whisper.peerMu.Unlock()
 	}()
-
 	// Run the peer handshake and state updates
 	if err := whisperPeer.handshake(); err != nil {
 		return err
 	}
 	whisperPeer.start()
 	defer whisperPeer.stop()
-
 	return whisper.runMessageLoop(whisperPeer, rw)
 }
 

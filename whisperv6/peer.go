@@ -32,7 +32,7 @@ import (
 // Peer represents a whisper protocol peer connection.
 type Peer struct {
 	host *Whisper
-	peer *p2p.Peer
+	peer Connection
 	ws   p2p.MsgReadWriter
 
 	trusted        bool
@@ -47,7 +47,7 @@ type Peer struct {
 }
 
 // newPeer creates a new whisper peer object, but does not run the handshake itself.
-func newPeer(host *Whisper, remote *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
+func newPeer(host *Whisper, remote Connection, rw p2p.MsgReadWriter) *Peer {
 	return &Peer{
 		host:           host,
 		peer:           remote,
@@ -85,7 +85,6 @@ func (peer *Peer) handshake() error {
 		pow := peer.host.MinPow()
 		powConverted := math.Float64bits(pow)
 		bloom := peer.host.BloomFilter()
-
 		errc <- p2p.SendItems(peer.ws, statusCode, ProtocolVersion, powConverted, bloom, isLightNode)
 	}()
 
