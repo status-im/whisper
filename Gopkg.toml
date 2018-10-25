@@ -45,5 +45,17 @@
   branch = "master"
   name = "golang.org/x/sync"
 
+[[constraint]]
+  name = "github.com/libp2p/go-libp2p"
+  version = "v6.0.23"
+
+[[constraint]]
+  name = "github.com/libp2p/go-libp2p-net"
+  version = "v3.0.15"
+
 [prune]
   go-tests = true
+
+[[constraint]]
+  name = "github.com/stretchr/testify"
+  version = "1.2.2"
