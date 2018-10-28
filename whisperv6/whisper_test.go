@@ -26,7 +26,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"golang.org/x/crypto/pbkdf2"
@@ -905,7 +905,7 @@ func TestSendP2PDirect(t *testing.T) {
 	defer w.Stop()
 
 	rwStub := &rwP2PMessagesStub{}
-	peerW := newPeer(w, p2p.NewPeer(discover.NodeID{}, "test", []p2p.Cap{}), rwStub)
+	peerW := newPeer(w, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), rwStub)
 
 	params, err := generateMessageParams()
 	if err != nil {
@@ -990,7 +990,7 @@ func TestHandleP2PMessageCode(t *testing.T) {
 	rwStub := &rwP2PMessagesStub{}
 	rwStub.payload = []interface{}{env}
 
-	peer := newPeer(nil, p2p.NewPeer(discover.NodeID{}, "test", []p2p.Cap{}), nil)
+	peer := newPeer(nil, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), nil)
 	peer.trusted = true
 
 	err = w.runMessageLoop(peer, rwStub)
