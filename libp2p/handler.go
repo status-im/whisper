@@ -3,8 +3,10 @@ package libp2p
 import (
 	"crypto/ecdsa"
 	"errors"
+	"sync/atomic"
 	"time"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/rlp"
 	crypto "github.com/libp2p/go-libp2p-crypto"
@@ -15,6 +17,9 @@ import (
 
 type connection struct {
 	id discover.NodeID
+
+	received *atomic.Value
+	period   time.Duration
 }
 
 func (c connection) ID() discover.NodeID {
@@ -22,7 +27,17 @@ func (c connection) ID() discover.NodeID {
 }
 
 func (c connection) IsFlaky() bool {
-	return false
+	val := c.received.Load()
+	received, ok := val.(time.Time)
+	if !ok {
+		log.Error("can't cast to time.Time", "value", val)
+		return false
+	}
+	return time.Since(received) > c.period
+}
+
+func (c connection) Update(t time.Time) {
+	c.received.Store(t)
 }
 
 // PeerIDToNodeID casts peer.ID (b58 encoded string) to discover.NodeID
@@ -47,7 +62,7 @@ func Handle(w *whisperv6.Whisper, s net.Stream, read, write time.Duration) error
 	if err != nil {
 		return err
 	}
-	return w.HandleConnection(connection{id}, Stream{
+	return w.HandleConnection(connection{id: id}, Stream{
 		s:            s,
 		rlp:          rlp.NewStream(s, 0),
 		readTimeout:  read,
