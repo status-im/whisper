@@ -27,6 +27,9 @@ func (c connection) ID() discover.NodeID {
 }
 
 func (c connection) IsFlaky() bool {
+	if c.period == 0 {
+		return false
+	}
 	val := c.received.Load()
 	received, ok := val.(time.Time)
 	if !ok {
@@ -57,12 +60,14 @@ func PeerIDToNodeID(pid string) (n discover.NodeID, err error) {
 	return discover.PubkeyID((*ecdsa.PublicKey)(seckey)), nil
 }
 
-func Handle(w *whisperv6.Whisper, s net.Stream, read, write time.Duration) error {
+func Handle(w *whisperv6.Whisper, s net.Stream, period, read, write time.Duration) error {
 	id, err := PeerIDToNodeID(peer.IDB58Encode(s.Conn().RemotePeer()))
 	if err != nil {
 		return err
 	}
-	return w.HandleConnection(connection{id: id}, Stream{
+	conn := connection{id: id, period: period, received: new(atomic.Value)}
+	conn.Update(time.Time{})
+	return w.HandleConnection(conn, Stream{
 		s:            s,
 		rlp:          rlp.NewStream(s, 0),
 		readTimeout:  read,

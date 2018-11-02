@@ -27,6 +27,7 @@ func TestWhisperOverLibp2p(t *testing.T) {
 	h, err := libp2p.New(context.Background(),
 		libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/7777"),
 		libp2p.Identity(priv),
+		libp2p.DisableRelay(),
 	)
 	require.NoError(t, err)
 	w := whisperv6.New(&whisperv6.Config{
@@ -34,7 +35,7 @@ func TestWhisperOverLibp2p(t *testing.T) {
 		MaxMessageSize:     whisperv6.DefaultMaxMessageSize,
 	})
 	h.SetStreamHandler(proto, func(s net.Stream) {
-		if err := Handle(w, s, 0, 0); err != nil {
+		if err := Handle(w, s, 0, 0, 0); err != nil {
 			log.Error("Connection was closed with error", "peer", s.Conn().RemotePeer(), "error", err)
 		}
 	})
@@ -42,9 +43,10 @@ func TestWhisperOverLibp2p(t *testing.T) {
 	require.NoError(t, err)
 	c, err := libp2p.New(context.Background(),
 		libp2p.Identity(priv),
+		libp2p.DisableRelay(),
 	)
 	require.NoError(t, err)
-	c.Peerstore().AddAddr(h.ID(), h.Addrs()[1], 30*time.Second)
+	c.Peerstore().AddAddr(h.ID(), h.Addrs()[0], 30*time.Second)
 	s, err := c.NewStream(context.TODO(), h.ID(), proto)
 	require.NoError(t, err)
 	msgs := NewStream(s, 2*time.Second, 0)

@@ -14,7 +14,7 @@ const (
 	pongMsg   byte = 2
 )
 
-func makePingHandler(c connection, period, r, w time.Duration) func(s net.Stream) {
+func makePingHandler(c connection, period, r, w time.Duration) net.StreamHandler {
 	return func(s net.Stream) {
 		defer s.Close()
 		ping := [1]byte{pingMsg}
