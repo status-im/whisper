@@ -37,7 +37,7 @@ func TestPingPong(t *testing.T) {
 
 	conn := connection{id: discover.NodeID{1}, received: new(atomic.Value), period: 10 * time.Second}
 	conn.Update(time.Time{})
-	h.SetStreamHandler(pingproto, makePingHandler(conn, 1*time.Second, 10*time.Second, 10*time.Second))
+	h.SetStreamHandler(pingproto, makePingHandler(&conn, 1*time.Second, 10*time.Second, 10*time.Second))
 
 	s, err := c.NewStream(context.TODO(), h.ID(), pingproto)
 	require.NoError(t, err)
@@ -102,7 +102,7 @@ func TestConnectionClosed(t *testing.T) {
 			}
 		}
 	})
-	h.SetStreamHandler(pingproto, makePingHandler(conn, time.Second, time.Second, time.Second))
+	h.SetStreamHandler(pingproto, makePingHandler(&conn, time.Second, time.Second, time.Second))
 
 	_, err = c.NewStream(context.TODO(), h.ID(), pingproto)
 	require.NoError(t, err)

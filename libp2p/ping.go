@@ -14,7 +14,7 @@ const (
 	pongMsg   byte = 2
 )
 
-func makePingHandler(c connection, period, r, w time.Duration) net.StreamHandler {
+func makePingHandler(c *connection, period, r, w time.Duration) net.StreamHandler {
 	return func(s net.Stream) {
 		defer s.Close()
 		ping := [1]byte{pingMsg}
@@ -29,6 +29,7 @@ func makePingHandler(c connection, period, r, w time.Duration) net.StreamHandler
 				case <-quit:
 					return
 				case <-tick.C:
+					log.Trace("sending ping", "deadline", w)
 					s.SetWriteDeadline(time.Now().Add(w))
 					if _, err := s.Write(ping[:]); err != nil {
 						log.Error("error sending the ping", "error", err)
@@ -39,15 +40,17 @@ func makePingHandler(c connection, period, r, w time.Duration) net.StreamHandler
 		}()
 		for {
 			received[0] = 0
+			log.Trace("waiting for ping", "deadline", r)
 			s.SetReadDeadline(time.Now().Add(r))
 			if _, err := s.Read(received[:]); err != nil {
-				log.Error("error on read", "error", err)
+				log.Error("pinger error on read", "error", err)
 				close(quit)
 				s.Conn().Close()
 				return
 			}
 			switch received[0] {
 			case pingMsg:
+				log.Trace("sending pong", "deadline", w)
 				s.SetWriteDeadline(time.Now().Add(w))
 				if _, err := s.Write(pong[:]); err != nil {
 					log.Error("error sending a pong", "error", err)
