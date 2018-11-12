@@ -26,11 +26,12 @@
   version = "v1.7.1"
 
 [[projects]]
-  digest = "1:1dc638d013f2a6f6ae13568584e8fee7e172cbf295e82064ded18bcf6d63c04c"
+  digest = "1:e221b8d0ccd91e9ee0a2ddda27ec75518dd683de945d01c87816f64ce418bf91"
   name = "github.com/ethereum/go-ethereum"
   packages = [
     ".",
     "common",
+    "common/bitutil",
     "common/hexutil",
     "common/math",
     "common/mclock",
@@ -47,18 +48,19 @@
     "p2p",
     "p2p/discover",
     "p2p/discv5",
+    "p2p/enode",
+    "p2p/enr",
     "p2p/nat",
     "p2p/netutil",
     "params",
     "rlp",
     "rpc",
     "trie",
-    "whisper/whisperv6",
   ]
   pruneopts = "T"
-  revision = "31f0afca344c53678e98032d6306e0e4ff7b9be1"
+  revision = "2ad6673303bb48f8e3c2865386cfa928e92dbcbd"
   source = "github.com/status-im/go-ethereum"
-  version = "v1.8.16"
+  version = "v1.8.17"
 
 [[projects]]
   digest = "1:586ea76dbd0374d6fb649a91d70d652b7fe0ccffb8910a77468e7702e7901f3d"
@@ -211,7 +213,6 @@
     "github.com/ethereum/go-ethereum/p2p/nat",
     "github.com/ethereum/go-ethereum/rlp",
     "github.com/ethereum/go-ethereum/rpc",
-    "github.com/ethereum/go-ethereum/whisper/whisperv6",
     "github.com/syndtr/goleveldb/leveldb/errors",
     "golang.org/x/crypto/pbkdf2",
     "golang.org/x/sync/syncmap",
