@@ -1202,3 +1202,42 @@ func TestEventsWithoutConfirmation(t *testing.T) {
 		require.FailNow(t, "timed out waiting for an envelope.sent event")
 	}
 }
+
+func discardPipe() *p2p.MsgPipeRW {
+	rw1, rw2 := p2p.MsgPipe()
+	go func() {
+		for {
+			msg, err := rw1.ReadMsg()
+			if err != nil {
+				return
+			}
+			msg.Discard()
+		}
+	}()
+	return rw2
+}
+
+func TestRequestSentEventWithExpiry(t *testing.T) {
+	w := New(nil)
+	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"shh", 6}})
+	rw := discardPipe()
+	defer rw.Close()
+	w.peers[newPeer(w, p, rw)] = struct{}{}
+	events := make(chan EnvelopeEvent, 1)
+	sub := w.SubscribeEnvelopeEvents(events)
+	defer sub.Unsubscribe()
+	e := &Envelope{Nonce: 1}
+	require.NoError(t, w.RequestHistoricMessagesWithTimeout(p.ID().Bytes(), e, time.Millisecond))
+	verifyEvent := func(etype EventType) {
+		select {
+		case <-time.After(time.Second):
+			require.FailNow(t, "error waiting for a event type %s", etype)
+		case ev := <-events:
+			require.Equal(t, etype, ev.Event)
+			require.Equal(t, p.ID(), ev.Peer)
+			require.Equal(t, e.Hash(), ev.Hash)
+		}
+	}
+	verifyEvent(EventMailServerRequestSent)
+	verifyEvent(EventMailServerRequestExpired)
+}
