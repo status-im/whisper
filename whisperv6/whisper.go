@@ -971,7 +971,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					return errors.New("invalid request response message")
 				}
 
-				event, err := CreateMailServerEvent(payload)
+				event, err := CreateMailServerEvent(p.peer.ID(), payload)
 
 				if err != nil {
 					log.Warn("error while parsing request complete code, peer will be disconnected", "peer", p.peer.ID(), "err", err)

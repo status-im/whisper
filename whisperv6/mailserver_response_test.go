@@ -1,100 +1,56 @@
 package whisperv6
 
 import (
-	"bytes"
 	"encoding/binary"
-	"strings"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/stretchr/testify/require"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 )
 
 func checkValidErrorPayload(t *testing.T, id []byte, errorMsg string) {
 	requestID := common.BytesToHash(id)
-
 	errPayload := CreateMailServerRequestFailedPayload(requestID, errors.New(errorMsg))
+	nid := enode.ID{1}
+	event, err := CreateMailServerEvent(nid, errPayload)
 
-	event, err := CreateMailServerEvent(errPayload)
-
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-		return
-	}
-
-	if event == nil {
-		t.Errorf("Could not parse payload: %v", errPayload)
-		return
-	}
-
-	if !bytes.Equal(event.Hash[:], requestID[:]) {
-		t.Errorf("Unexpected hash: %v, expected %v", event.Hash, requestID)
-		return
-	}
+	require.NoError(t, err)
+	require.NotNil(t, event)
+	require.Equal(t, nid, event.Peer)
+	require.Equal(t, requestID, event.Hash)
 
 	eventData, ok := event.Data.(*MailServerResponse)
 	if !ok {
-		t.Errorf("Unexpected data in event: %v, expected a MailServerResponse", event.Data)
-		return
+		require.FailNow(t, "Unexpected data in event: %v, expected a MailServerResponse", event.Data)
 	}
-
-	if strings.Compare(eventData.Error.Error(), errorMsg) != 0 {
-		t.Errorf("Unexpected error string: '%s', expected '%s'", eventData, errorMsg)
-		return
-	}
+	require.EqualError(t, eventData.Error, errorMsg)
 }
 
 func checkValidSuccessPayload(t *testing.T, id []byte, lastHash []byte, timestamp uint32, envHash []byte) {
 	requestID := common.BytesToHash(id)
 	lastEnvelopeHash := common.BytesToHash(lastHash)
-
 	timestampBytes := make([]byte, 4)
 	binary.LittleEndian.PutUint32(timestampBytes, timestamp)
-
 	envelopeHash := common.BytesToHash(envHash)
-
 	cursor := append(timestampBytes, envelopeHash[:]...)
-
 	successPayload := CreateMailServerRequestCompletedPayload(requestID, lastEnvelopeHash, cursor)
+	nid := enode.ID{1}
+	event, err := CreateMailServerEvent(nid, successPayload)
 
-	event, err := CreateMailServerEvent(successPayload)
-
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-		return
-	}
-
-	if event == nil {
-		t.Errorf("Could not parse payload: %v", successPayload)
-		return
-	}
-
-	if !bytes.Equal(event.Hash[:], requestID[:]) {
-		t.Errorf("Unexpected hash: %v, expected %v", event.Hash, requestID)
-		return
-	}
+	require.NoError(t, err)
+	require.NotNil(t, event)
+	require.Equal(t, nid, event.Peer)
+	require.Equal(t, requestID, event.Hash)
 
 	eventData, ok := event.Data.(*MailServerResponse)
 	if !ok {
-		t.Errorf("Unexpected data in event: %v, expected a MailServerResponse", event.Data)
-		return
+		require.FailNow(t, "Unexpected data in event: %v, expected a MailServerResponse", event.Data)
 	}
-
-	if !bytes.Equal(eventData.LastEnvelopeHash[:], lastEnvelopeHash[:]) {
-		t.Errorf("Unexpected LastEnvelopeHash: %v, expected %v",
-			eventData.LastEnvelopeHash, lastEnvelopeHash)
-		return
-	}
-
-	if !bytes.Equal(eventData.Cursor, cursor) {
-		t.Errorf("Unexpected cursor: %v, expected: %v", eventData.Cursor, cursor)
-		return
-	}
-
-	if eventData.Error != nil {
-		t.Errorf("Unexpected error: %v", eventData.Error)
-		return
-	}
+	require.Equal(t, lastEnvelopeHash, eventData.LastEnvelopeHash)
+	require.Equal(t, cursor, eventData.Cursor)
+	require.NoError(t, eventData.Error)
 }
 
 func TestCreateMailServerEvent(t *testing.T) {
@@ -113,18 +69,11 @@ func TestCreateMailServerEvent(t *testing.T) {
 	// invalid payloads
 
 	// too small
-	_, err := CreateMailServerEvent([]byte{0x00})
-	if err == nil {
-		t.Errorf("Expected an error, got nil")
-		return
-	}
+	_, err := CreateMailServerEvent(enode.ID{}, []byte{0x00})
+	require.Error(t, err)
 
 	// too big and not error payload
 	payloadTooBig := make([]byte, common.HashLength*2+cursorSize+100)
-	_, err = CreateMailServerEvent(payloadTooBig)
-	if err == nil {
-		t.Errorf("Expected an error, got nil")
-		return
-	}
-
+	_, err = CreateMailServerEvent(enode.ID{}, payloadTooBig)
+	require.Error(t, err)
 }
