@@ -1001,6 +1001,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 			//   1. Sending a request contains an ID,
 			//   2. Each sync reponse contains this ID,
 			//   3. There is a way to call whisper.SyncMessages() and wait for the response.Final to be received for that particular request ID.
+			//   4. If Cursor is not empty, another p2pSyncRequestCode should be sent.
 			if p.trusted && whisper.mailServer != nil {
 				var resp SyncResponse
 				if err = packet.Decode(&resp); err != nil {
