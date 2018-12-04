@@ -1324,21 +1324,23 @@ func TestHandleP2PSyncResponseCode(t *testing.T) {
 	w := New(nil)
 	w.RegisterServer(mailMock)
 
+	envelopesCount := 3
+
 	go func() {
 		params, err := generateMessageParams()
 		require.NoError(t, err)
-		params.TTL = 1
 		msg, err := NewSentMessage(params)
 		require.NoError(t, err)
-		env1, err := msg.Wrap(params, time.Now())
-		require.NoError(t, err)
-		env2, err := msg.Wrap(params, time.Now())
-		require.NoError(t, err)
-		env3, err := msg.Wrap(params, time.Now())
-		require.NoError(t, err)
+
+		var envelopes []*Envelope
+		for i := 0; i < envelopesCount; i++ {
+			env, err := msg.Wrap(params, time.Now())
+			require.NoError(t, err)
+			envelopes = append(envelopes, env)
+		}
 
 		err = p2p.Send(rw1, p2pSyncResponseCode, SyncResponse{
-			Envelopes: []*Envelope{env1, env2, env3},
+			Envelopes: envelopes,
 		})
 		require.NoError(t, err)
 		require.NoError(t, rw1.Close())
@@ -1349,7 +1351,7 @@ func TestHandleP2PSyncResponseCode(t *testing.T) {
 		require.FailNow(t, "invalid err", err)
 	}
 
-	mailMock.AssertNumberOfCalls(t, "Archive", 3)
+	mailMock.AssertNumberOfCalls(t, "Archive", envelopesCount)
 }
 
 type stubMailServer struct{}
