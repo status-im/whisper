@@ -30,6 +30,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"golang.org/x/crypto/pbkdf2"
@@ -1240,4 +1241,138 @@ func TestRequestSentEventWithExpiry(t *testing.T) {
 	}
 	verifyEvent(EventMailServerRequestSent)
 	verifyEvent(EventMailServerRequestExpired)
+}
+
+func TestSyncMessages(t *testing.T) {
+	t.Run("WithoutMailServer", func(t *testing.T) {
+		w := New(nil)
+		err := w.SyncMessages(nil, SyncMailRequest{})
+		require.EqualError(t, err, "can not sync messages if Mail Server is not configured")
+	})
+
+	t.Run("WithoutPeer", func(t *testing.T) {
+		w := New(nil)
+		w.RegisterServer(&stubMailServer{})
+		err := w.SyncMessages([]byte{0x01, 0x02}, SyncMailRequest{})
+		require.EqualError(t, err, "Could not find peer with ID: 0102")
+	})
+
+	t.Run("AllGood", func(t *testing.T) {
+		w := New(nil)
+		w.RegisterServer(&stubMailServer{})
+
+		p := p2p.NewPeer(enode.ID{0x01}, "peer01", nil)
+		rw1, rw2 := p2p.MsgPipe()
+
+		w.peers[newPeer(w, p, rw1)] = struct{}{}
+
+		go func() {
+			err := w.SyncMessages(p.ID().Bytes(), SyncMailRequest{})
+			require.NoError(t, err)
+		}()
+
+		require.NoError(t, p2p.ExpectMsg(rw2, p2pSyncRequestCode, nil))
+	})
+}
+
+func TestSendSyncResponse(t *testing.T) {
+	w := New(nil)
+	p := p2p.NewPeer(enode.ID{0x01}, "peer01", nil)
+	rw1, rw2 := p2p.MsgPipe()
+	whisperPeer := newPeer(w, p, rw1)
+
+	go func() {
+		err := w.SendSyncResponse(whisperPeer, SyncResponse{})
+		require.NoError(t, err)
+	}()
+
+	require.NoError(t, p2p.ExpectMsg(rw2, p2pSyncResponseCode, nil))
+}
+
+func TestHandleP2PSyncRequestCode(t *testing.T) {
+	rw1, rw2 := p2p.MsgPipe()
+	peer := newPeer(nil, p2p.NewPeer(enode.ID{}, "test", nil), nil)
+
+	mailMock := &mockMailServer{}
+	mailMock.On("SyncMail", peer, mock.Anything).Return(nil)
+
+	w := New(nil)
+	w.RegisterServer(mailMock)
+
+	go func() {
+		err := p2p.Send(rw1, p2pSyncRequestCode, SyncMailRequest{})
+		require.NoError(t, err)
+		require.NoError(t, rw1.Close())
+	}()
+
+	err := w.runMessageLoop(peer, rw2)
+	if err != nil && err != p2p.ErrPipeClosed {
+		require.FailNow(t, "invalid err", err)
+	}
+
+	mailMock.AssertNumberOfCalls(t, "SyncMail", 1)
+}
+
+func TestHandleP2PSyncResponseCode(t *testing.T) {
+	rw1, rw2 := p2p.MsgPipe()
+	peer := newPeer(nil, p2p.NewPeer(enode.ID{}, "test", nil), nil)
+	peer.trusted = true
+
+	mailMock := &mockMailServer{}
+	mailMock.On("Archive", mock.Anything)
+
+	w := New(nil)
+	w.RegisterServer(mailMock)
+
+	envelopesCount := 3
+
+	go func() {
+		params, err := generateMessageParams()
+		require.NoError(t, err)
+		msg, err := NewSentMessage(params)
+		require.NoError(t, err)
+
+		var envelopes []*Envelope
+		for i := 0; i < envelopesCount; i++ {
+			env, err := msg.Wrap(params, time.Now())
+			require.NoError(t, err)
+			envelopes = append(envelopes, env)
+		}
+
+		err = p2p.Send(rw1, p2pSyncResponseCode, SyncResponse{
+			Envelopes: envelopes,
+		})
+		require.NoError(t, err)
+		require.NoError(t, rw1.Close())
+	}()
+
+	err := w.runMessageLoop(peer, rw2)
+	if err != nil && err != p2p.ErrPipeClosed {
+		require.FailNow(t, "invalid err", err)
+	}
+
+	mailMock.AssertNumberOfCalls(t, "Archive", envelopesCount)
+}
+
+type stubMailServer struct{}
+
+func (stubMailServer) Archive(env *Envelope)                 {}
+func (stubMailServer) DeliverMail(*Peer, *Envelope)          {}
+func (stubMailServer) SyncMail(*Peer, SyncMailRequest) error { return nil }
+
+type mockMailServer struct {
+	mock.Mock
+}
+
+func (m *mockMailServer) Archive(env *Envelope) {
+	m.Called(env)
+}
+
+func (m *mockMailServer) DeliverMail(p *Peer, env *Envelope) {
+	m.Called(p, env)
+}
+
+func (m *mockMailServer) SyncMail(p *Peer, r SyncMailRequest) error {
+	args := m.Called(p, r)
+	return args.Error(0)
 }
