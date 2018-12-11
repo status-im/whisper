@@ -34,6 +34,7 @@ package whisperv6
 
 import (
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -81,6 +82,8 @@ const (
 
 	DefaultTTL           = 50 // seconds
 	DefaultSyncAllowance = 10 // seconds
+
+	MaxLimitInSyncMailRequest = 1000
 )
 
 // MailServer represents a mail server, capable of
@@ -112,8 +115,8 @@ type SyncMailRequest struct {
 
 // Validate checks request's fields if they are valid.
 func (r SyncMailRequest) Validate() error {
-	if r.Limit > 1000 {
-		return errors.New("invalid 'Limit' value, expected lower than 1000")
+	if r.Limit > MaxLimitInSyncMailRequest {
+		return fmt.Errorf("invalid 'Limit' value, expected lower than %d", MaxLimitInSyncMailRequest)
 	}
 
 	if r.Lower > r.Upper {
@@ -130,11 +133,4 @@ type SyncResponse struct {
 	Cursor    []byte
 	Final     bool // if true it means all envelopes were processed
 	Error     string
-}
-
-// IsFinal returns true if it's the final response for the request.
-// It might be a successful final response (r.Final being true)
-// or an error occured (r.Error being not empty).
-func (r SyncResponse) IsFinal() bool {
-	return r.Final || r.Error != ""
 }
