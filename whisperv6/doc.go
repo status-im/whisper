@@ -33,6 +33,7 @@ particularly the notion of singular endpoints.
 package whisperv6
 
 import (
+	"errors"
 	"time"
 )
 
@@ -107,6 +108,19 @@ type SyncMailRequest struct {
 	Limit uint32
 	// Cursor is used for pagination of the results.
 	Cursor []byte
+}
+
+// Validate checks request's fields if they are valid.
+func (r SyncMailRequest) Validate() error {
+	if r.Limit > 1000 {
+		return errors.New("invalid 'Limit' value, expected lower than 1000")
+	}
+
+	if r.Lower > r.Upper {
+		return errors.New("invalid 'Lower' value, can't be greater than 'Upper'")
+	}
+
+	return nil
 }
 
 // SyncResponse is a struct representing a response sent to the peer
