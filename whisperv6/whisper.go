@@ -1006,17 +1006,21 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					return fmt.Errorf("failed to decode p2pSyncResponseCode payload: %v", err)
 				}
 
-				log.Info("received sync response", "count", len(resp.Envelopes), "final", resp.Final, "err", resp.Error)
+				log.Info("received sync response", "count", len(resp.Envelopes), "final", resp.Final, "err", resp.Error, "cursor", resp.Cursor)
 
 				for _, envelope := range resp.Envelopes {
 					whisper.mailServer.Archive(envelope)
 				}
 
-				if resp.Error != "" {
-					log.Error("failed to sync envelopes", "err", resp.Error)
-				}
-				if resp.Final {
-					log.Info("finished to sync envelopes successfully")
+				if resp.Error != "" || resp.Final {
+					whisper.envelopeFeed.Send(EnvelopeEvent{
+						Event: EventMailServerSyncFinished,
+						Peer:  p.peer.ID(),
+						Data: SyncEventResponse{
+							Cursor: resp.Cursor,
+							Error:  resp.Error,
+						},
+					})
 				}
 			}
 		case p2pRequestCode:
