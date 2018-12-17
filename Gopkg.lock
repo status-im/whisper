@@ -2,6 +2,17 @@
 
 
 [[projects]]
+  digest = "1:777f1f0fc92c6fb838ff214ef3b05160b513c262beb88fa342d7a50e797b9539"
+  name = "github.com/allegro/bigcache"
+  packages = [
+    ".",
+    "queue",
+  ]
+  pruneopts = "T"
+  revision = "f31987a23e44c5121ef8c8b2f2ea2e8ffa37b068"
+  version = "v1.1.0"
+
+[[projects]]
   branch = "master"
   digest = "1:495c7006c2f48b705f0d89fd8449a2ae70622bb748788d9d17caafa65a6769f9"
   name = "github.com/aristanetworks/goarista"
@@ -34,7 +45,7 @@
   version = "v1.7.1"
 
 [[projects]]
-  digest = "1:e221b8d0ccd91e9ee0a2ddda27ec75518dd683de945d01c87816f64ce418bf91"
+  digest = "1:ca77c7225db49544c7bf8ebc93d18e4063f32e60ed4894ff590c1cb8fe315d66"
   name = "github.com/ethereum/go-ethereum"
   packages = [
     ".",
@@ -66,9 +77,9 @@
     "trie",
   ]
   pruneopts = "T"
-  revision = "2ad6673303bb48f8e3c2865386cfa928e92dbcbd"
+  revision = "ffe89538dae6e643cb5dc599fe58c59a29eb75e5"
   source = "github.com/status-im/go-ethereum"
-  version = "v1.8.17"
+  version = "v1.8.20"
 
 [[projects]]
   digest = "1:586ea76dbd0374d6fb649a91d70d652b7fe0ccffb8910a77468e7702e7901f3d"
@@ -127,10 +138,19 @@
   version = "v1.6.0"
 
 [[projects]]
+  digest = "1:8d58d88a7b2a7440509bee60f3e865773e8f79e622817ddb63ba3cda9efba25a"
+  name = "github.com/stretchr/objx"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "477a77ecc69700c7cdeb1fa9e129548e1c1c393c"
+  version = "v0.1.1"
+
+[[projects]]
   digest = "1:e95496462101745805bd4e041a5b841e108c7cf761264d53648246308de2761e"
   name = "github.com/stretchr/testify"
   packages = [
     "assert",
+    "mock",
     "require",
   ]
   pruneopts = "T"
@@ -240,6 +260,8 @@
     "github.com/ethereum/go-ethereum/p2p/nat",
     "github.com/ethereum/go-ethereum/rlp",
     "github.com/ethereum/go-ethereum/rpc",
+    "github.com/stretchr/testify/assert",
+    "github.com/stretchr/testify/mock",
     "github.com/stretchr/testify/require",
     "github.com/syndtr/goleveldb/leveldb/errors",
     "golang.org/x/crypto/pbkdf2",
