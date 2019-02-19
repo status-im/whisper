@@ -45,7 +45,7 @@
   version = "v1.7.1"
 
 [[projects]]
-  digest = "1:11fb76e8d45f1b8e6812a61ea031e976afae1e21aa5f2aeac94322cbdaab31fc"
+  digest = "1:009b98a0d651b571c84cbaeaf57e3b8809dcfb5b4745b562ed93ce7137f4e3a8"
   name = "github.com/ethereum/go-ethereum"
   packages = [
     ".",
@@ -76,7 +76,7 @@
     "trie",
   ]
   pruneopts = "T"
-  revision = "5c51e27be022a4c5056791060884eb1cd6d6d3d4"
+  revision = "6336dc865027103ac20afaf332e5dee3ab1f950b"
   source = "github.com/status-im/go-ethereum"
   version = "v1.8.21"
 
