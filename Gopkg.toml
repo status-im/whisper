@@ -30,7 +30,7 @@
 
 [[constraint]]
   name = "github.com/ethereum/go-ethereum"
-  version = "=v1.8.21"
+  version = "=v1.8.23"
   source = "github.com/status-im/go-ethereum"
 
 [[constraint]]
