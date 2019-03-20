@@ -1218,6 +1218,50 @@ func discardPipe() *p2p.MsgPipeRW {
 	return rw2
 }
 
+func TestWhisperTimeDesyncEnvelopeIgnored(t *testing.T) {
+	c := &Config{
+		MaxMessageSize:     DefaultMaxMessageSize,
+		MinimumAcceptedPOW: 0,
+	}
+	rw1, rw2 := p2p.MsgPipe()
+	defer func() {
+		rw1.Close()
+		rw2.Close()
+	}()
+	p1 := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"shh", 6}})
+	p2 := p2p.NewPeer(enode.ID{2}, "2", []p2p.Cap{{"shh", 6}})
+	w1, w2 := New(c), New(c)
+	errc := make(chan error)
+	go func() {
+		w1.HandlePeer(p2, rw2)
+	}()
+	go func() {
+		errc <- w2.HandlePeer(p1, rw1)
+	}()
+	w1.SetTimeSource(func() time.Time {
+		return time.Now().Add(time.Hour)
+	})
+	env := &Envelope{
+		Expiry: uint32(time.Now().Add(time.Hour).Unix()),
+		TTL:    30,
+		Topic:  TopicType{1},
+		Data:   []byte{1, 1, 1},
+	}
+	require.NoError(t, w1.Send(env))
+	select {
+	case err := <-errc:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+	}
+	rw2.Close()
+	select {
+	case err := <-errc:
+		require.Error(t, err, "p2p: read or write on closed message pipe")
+	case <-time.After(time.Second):
+		require.FailNow(t, "connection wasn't closed in expected time")
+	}
+}
+
 func TestRequestSentEventWithExpiry(t *testing.T) {
 	w := New(nil)
 	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"shh", 6}})

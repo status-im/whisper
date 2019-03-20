@@ -867,6 +867,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				log.Warn("failed to read envelopes data", "peer", p.peer.ID(), "error", err)
 				return errors.New("invalid enveloopes")
 			}
+
 			if !whisper.disableConfirmations {
 				go whisper.sendConfirmation(p.peer.ID(), rw, data)
 			}
@@ -1080,7 +1081,8 @@ func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
 	if sent > now {
 		if sent-DefaultSyncAllowance > now {
 			envelopeErrFromFutureCounter.Inc(1)
-			return false, fmt.Errorf("envelope created in the future [%x]", envelope.Hash())
+			log.Warn("envelope created in the future", "hash", envelope.Hash())
+			return false, nil
 		}
 		// recalculate PoW, adjusted for the time difference, plus one second for latency
 		envelope.calculatePoW(sent - now + 1)
@@ -1089,7 +1091,8 @@ func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
 	if envelope.Expiry < now {
 		if envelope.Expiry+DefaultSyncAllowance*2 < now {
 			envelopeErrVeryOldCounter.Inc(1)
-			return false, fmt.Errorf("very old message")
+			log.Warn("very old envelope", "hash", envelope.Hash())
+			return false, nil
 		}
 		log.Debug("expired envelope dropped", "hash", envelope.Hash().Hex())
 		envelopeErrExpiredCounter.Inc(1)
