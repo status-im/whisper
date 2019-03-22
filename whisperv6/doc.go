@@ -38,7 +38,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // Whisper protocol parameters
@@ -147,11 +147,12 @@ type MessagesResponse struct {
 	// Hash is a hash of all envelopes sent in the single batch.
 	Hash common.Hash
 	// Per envelope error.
-	Errors map[common.Hash]EnvelopeError
+	Errors []EnvelopeError
 }
 
 // EnvelopeError code and optional description of the error.
 type EnvelopeError struct {
+	Hash        common.Hash
 	Code        uint
 	Description string
 }
@@ -174,7 +175,7 @@ type Version1MessageResponse struct {
 }
 
 // NewMessagesResponse returns instane of the version messages response.
-func NewMessagesResponse(batch common.Hash, errors map[common.Hash]EnvelopeError) Version1MessageResponse {
+func NewMessagesResponse(batch common.Hash, errors []EnvelopeError) Version1MessageResponse {
 	return Version1MessageResponse{
 		Version: 1,
 		Response: MessagesResponse{
@@ -185,13 +186,14 @@ func NewMessagesResponse(batch common.Hash, errors map[common.Hash]EnvelopeError
 }
 
 // ErrorToEnvelopeError converts common golang error into EnvelopeError with a code.
-func ErrorToEnvelopeError(err error) EnvelopeError {
+func ErrorToEnvelopeError(hash common.Hash, err error) EnvelopeError {
 	code := EnvelopeOtherError
 	switch err.(type) {
 	case TimeSyncError:
 		code = EnvelopeTimeNotSynced
 	}
 	return EnvelopeError{
+		Hash:        hash,
 		Code:        code,
 		Description: err.Error(),
 	}

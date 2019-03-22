@@ -839,10 +839,10 @@ func (whisper *Whisper) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 }
 
 func (whisper *Whisper) sendConfirmation(peer enode.ID, rw p2p.MsgReadWriter, data []byte,
-	envelopes map[common.Hash]EnvelopeError) {
+	envelopeErrors []EnvelopeError) {
 	batchHash := crypto.Keccak256Hash(data)
-	if err := p2p.Send(rw, messageResponseCode, NewMessagesResponse(batchHash, envelopes)); err != nil {
-		log.Warn("failed to deliver messages response", "hash", batchHash, "envelopes errors", envelopes,
+	if err := p2p.Send(rw, messageResponseCode, NewMessagesResponse(batchHash, envelopeErrors)); err != nil {
+		log.Warn("failed to deliver messages response", "hash", batchHash, "envelopes errors", envelopeErrors,
 			"peer", peer, "error", err)
 	}
 	if err := p2p.Send(rw, batchAcknowledgedCode, batchHash); err != nil {
@@ -882,7 +882,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				return errors.New("invalid envelopes")
 			}
 			trouble := false
-			envelopeErrors := map[common.Hash]EnvelopeError{}
+			envelopeErrors := []EnvelopeError{}
 			for _, env := range envelopes {
 				cached, err := whisper.add(env, whisper.LightClientMode())
 				if err != nil {
@@ -891,7 +891,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 						trouble = true
 						log.Error("bad envelope received, peer will be disconnected", "peer", p.peer.ID(), "err", err)
 					}
-					envelopeErrors[env.Hash()] = ErrorToEnvelopeError(err)
+					envelopeErrors = append(envelopeErrors, ErrorToEnvelopeError(env.Hash(), err))
 				}
 
 				whisper.envelopeFeed.Send(EnvelopeEvent{
@@ -903,7 +903,6 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					p.mark(env)
 				}
 			}
-
 			if !whisper.disableConfirmations {
 				go whisper.sendConfirmation(p.peer.ID(), rw, data, envelopeErrors)
 			}

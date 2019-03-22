@@ -1104,10 +1104,56 @@ func TestConfirmationReceived(t *testing.T) {
 	require.NoError(t, err)
 	hash := crypto.Keccak256Hash(data)
 	require.NoError(t, p2p.SendItems(rw1, messagesCode, &e))
+	require.NoError(t, p2p.ExpectMsg(rw1, messageResponseCode, nil))
 	require.NoError(t, p2p.ExpectMsg(rw1, batchAcknowledgedCode, hash))
 }
 
-func TestEventsReceived(t *testing.T) {
+func TestMessagesResponseWithError(t *testing.T) {
+	conf := &Config{
+		MinimumAcceptedPOW: 0,
+		MaxMessageSize:     10 << 20,
+	}
+	w := New(conf)
+	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"shh", 6}})
+	rw1, rw2 := p2p.MsgPipe()
+	defer func() {
+		rw1.Close()
+		rw2.Close()
+	}()
+	errorc := make(chan error, 1)
+	go func() {
+		err := w.HandlePeer(p, rw2)
+		errorc <- err
+	}()
+	require.NoError(t, p2p.ExpectMsg(rw1, statusCode, []interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true}))
+	require.NoError(t, p2p.SendItems(rw1, statusCode, ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), true, true))
+
+	failed := Envelope{
+		Expiry: uint32(time.Now().Add(time.Hour).Unix()),
+		TTL:    10,
+		Topic:  TopicType{1},
+		Data:   make([]byte, 1<<10),
+		Nonce:  1,
+	}
+	normal := Envelope{
+		Expiry: uint32(time.Now().Unix()),
+		TTL:    10,
+		Topic:  TopicType{1},
+		Data:   make([]byte, 1<<10),
+		Nonce:  1,
+	}
+
+	data, err := rlp.EncodeToBytes([]*Envelope{&failed, &normal})
+	require.NoError(t, err)
+	hash := crypto.Keccak256Hash(data)
+	require.NoError(t, p2p.SendItems(rw1, messagesCode, &failed, &normal))
+	require.NoError(t, p2p.ExpectMsg(rw1, messageResponseCode, NewMessagesResponse(hash, []EnvelopeError{
+		{Hash: failed.Hash(), Code: EnvelopeTimeNotSynced, Description: "envelope from future"},
+	})))
+	require.NoError(t, p2p.ExpectMsg(rw1, batchAcknowledgedCode, hash))
+}
+
+func testConfirmationEvents(t *testing.T, envelope Envelope, envelopeErrors []EnvelopeError) {
 	conf := &Config{
 		MinimumAcceptedPOW: 0,
 		MaxMessageSize:     10 << 20,
@@ -1130,15 +1176,8 @@ func TestEventsReceived(t *testing.T) {
 	require.NoError(t, p2p.ExpectMsg(rw1, statusCode, []interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true}))
 	require.NoError(t, p2p.SendItems(rw1, statusCode, ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), true, true))
 
-	e := Envelope{
-		Expiry: uint32(time.Now().Add(10 * time.Second).Unix()),
-		TTL:    10,
-		Topic:  TopicType{1},
-		Data:   make([]byte, 1<<10),
-		Nonce:  1,
-	}
-	require.NoError(t, w.Send(&e))
-	require.NoError(t, p2p.ExpectMsg(rw1, messagesCode, []*Envelope{&e}))
+	require.NoError(t, w.Send(&envelope))
+	require.NoError(t, p2p.ExpectMsg(rw1, messagesCode, []*Envelope{&envelope}))
 
 	var hash common.Hash
 	select {
@@ -1150,15 +1189,44 @@ func TestEventsReceived(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		require.FailNow(t, "timed out waiting for an envelope.sent event")
 	}
+	require.NoError(t, p2p.Send(rw1, messageResponseCode, NewMessagesResponse(hash, envelopeErrors)))
 	require.NoError(t, p2p.Send(rw1, batchAcknowledgedCode, hash))
 	select {
 	case ev := <-events:
 		require.Equal(t, EventBatchAcknowledged, ev.Event)
 		require.Equal(t, p.ID(), ev.Peer)
 		require.Equal(t, hash, ev.Batch)
+		require.Equal(t, envelopeErrors, ev.Data)
 	case <-time.After(5 * time.Second):
 		require.FailNow(t, "timed out waiting for an batch.acknowledged event")
 	}
+}
+
+func TestConfirmationEventsReceived(t *testing.T) {
+	e := Envelope{
+		Expiry: uint32(time.Now().Add(10 * time.Second).Unix()),
+		TTL:    10,
+		Topic:  TopicType{1},
+		Data:   make([]byte, 1<<10),
+		Nonce:  1,
+	}
+	testConfirmationEvents(t, e, []EnvelopeError{})
+}
+
+func TestConfirmationEventsExtendedWithErrors(t *testing.T) {
+	e := Envelope{
+		Expiry: uint32(time.Now().Unix()),
+		TTL:    10,
+		Topic:  TopicType{1},
+		Data:   make([]byte, 1<<10),
+		Nonce:  1,
+	}
+	testConfirmationEvents(t, e, []EnvelopeError{
+		{
+			Hash:        e.Hash(),
+			Code:        EnvelopeTimeNotSynced,
+			Description: "test error",
+		}})
 }
 
 func TestEventsWithoutConfirmation(t *testing.T) {
