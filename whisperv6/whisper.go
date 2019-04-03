@@ -102,6 +102,8 @@ type Whisper struct {
 
 	mailServer MailServer // MailServer interface
 
+	messageStoreFabric func() MessageStore
+
 	envelopeFeed event.Feed
 
 	timeSource func() time.Time // source of time for whisper
@@ -150,6 +152,19 @@ func New(cfg *Config) *Whisper {
 	}
 
 	return whisper
+}
+
+// NewMessageStore returns object that implements MessageStore.
+func (whisper *Whisper) NewMessageStore() MessageStore {
+	if whisper.messageStoreFabric != nil {
+		return whisper.messageStoreFabric()
+	}
+	return NewMemoryMessageStore()
+}
+
+// SetMessageStore allows to inject custom implementation of the message store.
+func (whisper *Whisper) SetMessageStore(fabric func() MessageStore) {
+	whisper.messageStoreFabric = fabric
 }
 
 // SetTimeSource assigns a particular source of time to a whisper object.
