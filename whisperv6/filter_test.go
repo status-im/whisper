@@ -50,7 +50,7 @@ type FilterTestCase struct {
 
 func generateFilter(t *testing.T, symmetric bool) (*Filter, error) {
 	var f Filter
-	f.Messages = make(map[common.Hash]*ReceivedMessage)
+	f.Messages = NewMemoryMessageStore()
 
 	const topicNum = 8
 	f.Topics = make([][]byte, topicNum)
@@ -173,7 +173,7 @@ func TestInstallIdenticalFilters(t *testing.T) {
 		Topics:   filter1.Topics,
 		PoW:      filter1.PoW,
 		AllowP2P: filter1.AllowP2P,
-		Messages: make(map[common.Hash]*ReceivedMessage),
+		Messages: NewMemoryMessageStore(),
 	}
 
 	_, err := filters.Install(filter1)
@@ -249,7 +249,7 @@ func TestInstallFilterWithSymAndAsymKeys(t *testing.T) {
 		Topics:   filter1.Topics,
 		PoW:      filter1.PoW,
 		AllowP2P: filter1.AllowP2P,
-		Messages: make(map[common.Hash]*ReceivedMessage),
+		Messages: NewMemoryMessageStore(),
 	}
 
 	_, err = filters.Install(filter)
@@ -604,7 +604,7 @@ func TestMatchMessageAsym(t *testing.T) {
 
 func cloneFilter(orig *Filter) *Filter {
 	var clone Filter
-	clone.Messages = make(map[common.Hash]*ReceivedMessage)
+	clone.Messages = NewMemoryMessageStore()
 	clone.Src = orig.Src
 	clone.KeyAsym = orig.KeyAsym
 	clone.KeySym = orig.KeySym

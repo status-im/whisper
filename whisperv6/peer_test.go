@@ -189,7 +189,7 @@ func initialize(t *testing.T) {
 		node.shh.Start(nil)
 		topics := make([]TopicType, 0)
 		topics = append(topics, sharedTopic)
-		f := Filter{KeySym: sharedKey}
+		f := Filter{KeySym: sharedKey, Messages: NewMemoryMessageStore()}
 		f.Topics = [][]byte{topics[0][:]}
 		node.filerID, err = node.shh.Subscribe(&f)
 		if err != nil {
