@@ -1248,6 +1248,7 @@ func (whisper *Whisper) processQueue() {
 			whisper.envelopeFeed.Send(EnvelopeEvent{
 				Hash:  e.Hash(),
 				Event: EventEnvelopeAvailable,
+				Data:  EnvelopeAvailableData{},
 			})
 
 		case e = <-whisper.p2pMsgQueue:
@@ -1255,6 +1256,7 @@ func (whisper *Whisper) processQueue() {
 			whisper.envelopeFeed.Send(EnvelopeEvent{
 				Hash:  e.Hash(),
 				Event: EventEnvelopeAvailable,
+				Data:  EnvelopeAvailableData{P2P: true},
 			})
 		}
 	}
