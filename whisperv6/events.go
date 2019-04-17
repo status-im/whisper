@@ -50,8 +50,3 @@ type SyncEventResponse struct {
 	Cursor []byte
 	Error  string
 }
-
-// EnvelopeAvailableData is sent with EnvelopeAvailableEvent.
-type EnvelopeAvailableData struct {
-	P2P bool
-}
