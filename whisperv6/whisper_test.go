@@ -1531,6 +1531,7 @@ func (m *mockMailServer) SyncMail(p *Peer, r SyncMailRequest) error {
 func TestMailserverCompletionEvent(t *testing.T) {
 	w := New(nil)
 	require.NoError(t, w.Start(nil))
+	defer w.Stop()
 
 	rw1, rw2 := p2p.MsgPipe()
 	peer := newPeer(w, p2p.NewPeer(enode.ID{1}, "1", nil), rw1)
