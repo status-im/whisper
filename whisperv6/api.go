@@ -452,6 +452,7 @@ type Message struct {
 	PoW       float64   `json:"pow"`
 	Hash      []byte    `json:"hash"`
 	Dst       []byte    `json:"recipientPublicKey,omitempty"`
+	P2P       bool      `json:"bool,omitempty"`
 }
 
 type messageOverride struct {
@@ -472,6 +473,7 @@ func ToWhisperMessage(message *ReceivedMessage) *Message {
 		PoW:       message.PoW,
 		Hash:      message.EnvelopeHash.Bytes(),
 		Topic:     message.Topic,
+		P2P:       message.P2P,
 	}
 
 	if message.Dst != nil {
