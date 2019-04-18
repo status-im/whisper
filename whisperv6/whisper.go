@@ -815,6 +815,7 @@ func (whisper *Whisper) Start(*p2p.Server) error {
 	for i := 0; i < numCPU; i++ {
 		go whisper.processQueue()
 	}
+	go whisper.processP2P()
 
 	return nil
 }
@@ -1252,7 +1253,15 @@ func (whisper *Whisper) processQueue() {
 				Hash:  e.Hash(),
 				Event: EventEnvelopeAvailable,
 			})
+		}
+	}
+}
 
+func (whisper *Whisper) processP2P() {
+	for {
+		select {
+		case <-whisper.quit:
+			return
 		case e := <-whisper.p2pMsgQueue:
 			switch event := e.(type) {
 			case *Envelope:
