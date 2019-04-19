@@ -1527,3 +1527,44 @@ func (m *mockMailServer) SyncMail(p *Peer, r SyncMailRequest) error {
 	args := m.Called(p, r)
 	return args.Error(0)
 }
+
+func TestMailserverCompletionEvent(t *testing.T) {
+	w := New(nil)
+	require.NoError(t, w.Start(nil))
+	defer w.Stop()
+
+	rw1, rw2 := p2p.MsgPipe()
+	peer := newPeer(w, p2p.NewPeer(enode.ID{1}, "1", nil), rw1)
+	peer.trusted = true
+	w.peers[peer] = struct{}{}
+
+	events := make(chan EnvelopeEvent)
+	sub := w.SubscribeEnvelopeEvents(events)
+	defer sub.Unsubscribe()
+
+	envelopes := []*Envelope{{Data: []byte{1}}, {Data: []byte{2}}}
+	go func() {
+		require.NoError(t, p2p.Send(rw2, p2pMessageCode, envelopes))
+		require.NoError(t, p2p.Send(rw2, p2pRequestCompleteCode, [100]byte{})) // 2 hashes + cursor size
+		rw2.Close()
+	}()
+	require.EqualError(t, w.runMessageLoop(peer, rw1), "p2p: read or write on closed message pipe")
+
+	after := time.After(2 * time.Second)
+	count := 0
+	for {
+		select {
+		case <-after:
+			require.FailNow(t, "timed out waiting for all events")
+		case ev := <-events:
+			switch ev.Event {
+			case EventEnvelopeAvailable:
+				count++
+			case EventMailServerRequestCompleted:
+				require.Equal(t, count, len(envelopes),
+					"all envelope.avaiable events mut be recevied before request is compelted")
+				return
+			}
+		}
+	}
+}

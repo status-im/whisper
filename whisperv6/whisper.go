@@ -90,9 +90,9 @@ type Whisper struct {
 	peerMu sync.RWMutex       // Mutex to sync the active peer set
 	peers  map[*Peer]struct{} // Set of currently active peers
 
-	messageQueue chan *Envelope // Message queue for normal whisper messages
-	p2pMsgQueue  chan *Envelope // Message queue for peer-to-peer messages (not to be forwarded any further)
-	quit         chan struct{}  // Channel used for graceful exit
+	messageQueue chan *Envelope   // Message queue for normal whisper messages
+	p2pMsgQueue  chan interface{} // Message queue for peer-to-peer messages (not to be forwarded any further) and history delivery confirmations.
+	quit         chan struct{}    // Channel used for graceful exit
 
 	settings syncmap.Map // holds configuration settings that can be dynamically changed
 
@@ -125,7 +125,7 @@ func New(cfg *Config) *Whisper {
 		expirations:          make(map[uint32]mapset.Set),
 		peers:                make(map[*Peer]struct{}),
 		messageQueue:         make(chan *Envelope, messageQueueLimit),
-		p2pMsgQueue:          make(chan *Envelope, messageQueueLimit),
+		p2pMsgQueue:          make(chan interface{}, messageQueueLimit),
 		quit:                 make(chan struct{}),
 		syncAllowance:        DefaultSyncAllowance,
 		timeSource:           time.Now,
@@ -815,6 +815,7 @@ func (whisper *Whisper) Start(*p2p.Server) error {
 	for i := 0; i < numCPU; i++ {
 		go whisper.processQueue()
 	}
+	go whisper.processP2P()
 
 	return nil
 }
@@ -1005,7 +1006,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 
 				if err = packet.Decode(&envelopes); err == nil {
 					for _, envelope := range envelopes {
-						whisper.postEvent(envelope, true)
+						whisper.postP2P(envelope)
 					}
 					continue
 				}
@@ -1019,7 +1020,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				}
 
 				if err = packet.Decode(&envelope); err == nil {
-					whisper.postEvent(envelope, true)
+					whisper.postP2P(envelope)
 					continue
 				}
 
@@ -1103,7 +1104,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				}
 
 				if event != nil {
-					whisper.envelopeFeed.Send(*event)
+					whisper.postP2P(*event)
 				}
 
 			}
@@ -1208,14 +1209,19 @@ func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
 	return true, nil
 }
 
+func (whisper *Whisper) postP2P(event interface{}) {
+	whisper.p2pMsgQueue <- event
+}
+
 // postEvent queues the message for further processing.
 func (whisper *Whisper) postEvent(envelope *Envelope, isP2P bool) {
 	if isP2P {
-		whisper.p2pMsgQueue <- envelope
+		whisper.postP2P(envelope)
 	} else {
 		whisper.checkOverflow()
 		whisper.messageQueue <- envelope
 	}
+
 }
 
 // checkOverflow checks if message queue overflow occurs and reports it if necessary.
@@ -1237,25 +1243,36 @@ func (whisper *Whisper) checkOverflow() {
 
 // processQueue delivers the messages to the watchers during the lifetime of the whisper node.
 func (whisper *Whisper) processQueue() {
-	var e *Envelope
 	for {
 		select {
 		case <-whisper.quit:
 			return
-
-		case e = <-whisper.messageQueue:
+		case e := <-whisper.messageQueue:
 			whisper.filters.NotifyWatchers(e, false)
 			whisper.envelopeFeed.Send(EnvelopeEvent{
 				Hash:  e.Hash(),
 				Event: EventEnvelopeAvailable,
 			})
+		}
+	}
+}
 
-		case e = <-whisper.p2pMsgQueue:
-			whisper.filters.NotifyWatchers(e, true)
-			whisper.envelopeFeed.Send(EnvelopeEvent{
-				Hash:  e.Hash(),
-				Event: EventEnvelopeAvailable,
-			})
+func (whisper *Whisper) processP2P() {
+	for {
+		select {
+		case <-whisper.quit:
+			return
+		case e := <-whisper.p2pMsgQueue:
+			switch event := e.(type) {
+			case *Envelope:
+				whisper.filters.NotifyWatchers(event, true)
+				whisper.envelopeFeed.Send(EnvelopeEvent{
+					Hash:  event.Hash(),
+					Event: EventEnvelopeAvailable,
+				})
+			case EnvelopeEvent:
+				whisper.envelopeFeed.Send(event)
+			}
 		}
 	}
 }
