@@ -513,6 +513,17 @@ func (whisper *Whisper) SendP2PDirect(peer *Peer, envelopes ...*Envelope) error 
 	return p2p.Send(peer.ws, p2pMessageCode, envelopes)
 }
 
+// SendRawP2PDirect sends a peer-to-peer message to a specific peer.
+// If only a single envelope is given, data is sent as a single object
+// rather than a slice. This is important to keep this method backward compatible
+// as it used to send only single envelopes.
+func (whisper *Whisper) SendRawP2PDirect(peer *Peer, envelopes ...rlp.RawValue) error {
+	if len(envelopes) == 1 {
+		return p2p.Send(peer.ws, p2pMessageCode, envelopes[0])
+	}
+	return p2p.Send(peer.ws, p2pMessageCode, envelopes)
+}
+
 // NewKeyPair generates a new cryptographic identity for the client, and injects
 // it into the known identities for message decryption. Returns ID of the new key pair.
 func (whisper *Whisper) NewKeyPair() (string, error) {
@@ -1062,7 +1073,12 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 
 				log.Info("received sync response", "count", len(resp.Envelopes), "final", resp.Final, "err", resp.Error, "cursor", resp.Cursor)
 
-				for _, envelope := range resp.Envelopes {
+				for _, rawEnvelope := range resp.Envelopes {
+					var envelope *Envelope
+					if err := rlp.DecodeBytes(rawEnvelope, &envelope); err != nil {
+						return errors.New("invalid envelopes")
+					}
+
 					whisper.mailServer.Archive(envelope)
 				}
 
