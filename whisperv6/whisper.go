@@ -493,6 +493,11 @@ func (whisper *Whisper) SendSyncResponse(p *Peer, data SyncResponse) error {
 	return p2p.Send(p.ws, p2pSyncResponseCode, data)
 }
 
+// SendRawSyncResponse sends a response to a Mail Server with a slice of envelopes.
+func (whisper *Whisper) SendRawSyncResponse(p *Peer, data RawSyncResponse) error {
+	return p2p.Send(p.ws, p2pSyncResponseCode, data)
+}
+
 // SendP2PMessage sends a peer-to-peer message to a specific peer.
 func (whisper *Whisper) SendP2PMessage(peerID []byte, envelopes ...*Envelope) error {
 	p, err := whisper.getPeer(peerID)
@@ -1073,12 +1078,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 
 				log.Info("received sync response", "count", len(resp.Envelopes), "final", resp.Final, "err", resp.Error, "cursor", resp.Cursor)
 
-				for _, rawEnvelope := range resp.Envelopes {
-					var envelope *Envelope
-					if err := rlp.DecodeBytes(rawEnvelope, &envelope); err != nil {
-						return errors.New("invalid envelopes")
-					}
-
+				for _, envelope := range resp.Envelopes {
 					whisper.mailServer.Archive(envelope)
 				}
 
