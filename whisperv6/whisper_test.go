@@ -1378,7 +1378,7 @@ func TestSyncMessages(t *testing.T) {
 
 		w.peers[newPeer(w, p, rw1)] = struct{}{}
 
-		err := w.SyncMessages(p.ID().Bytes(), SyncMailRequest{Lower: 10, Upper: 5})
+		err := w.SyncMessages(p.ID().Bytes(), SyncMailRequest{Limit: 10, Lower: 10, Upper: 5})
 		require.EqualError(t, err, "invalid 'Lower' value, can't be greater than 'Upper'")
 	})
 
@@ -1392,7 +1392,7 @@ func TestSyncMessages(t *testing.T) {
 		w.peers[newPeer(w, p, rw1)] = struct{}{}
 
 		go func() {
-			err := w.SyncMessages(p.ID().Bytes(), SyncMailRequest{})
+			err := w.SyncMessages(p.ID().Bytes(), SyncMailRequest{Limit: 10})
 			require.NoError(t, err)
 		}()
 
@@ -1425,14 +1425,14 @@ func TestHandleP2PSyncRequestCode(t *testing.T) {
 	w.RegisterServer(mailMock)
 
 	go func() {
-		err := p2p.Send(rw1, p2pSyncRequestCode, SyncMailRequest{})
+		err := p2p.Send(rw1, p2pSyncRequestCode, SyncMailRequest{Limit: 10})
 		require.NoError(t, err)
 		require.NoError(t, rw1.Close())
 	}()
 
 	err := w.runMessageLoop(peer, rw2)
 	if err != nil && err != p2p.ErrPipeClosed {
-		require.FailNow(t, "invalid err", err)
+		require.FailNow(t, "invalid err", err.Error())
 	}
 
 	mailMock.AssertNumberOfCalls(t, "SyncMail", 1)
@@ -1449,7 +1449,7 @@ func TestHandleP2PSyncRequestCodeWithInvalidRequest(t *testing.T) {
 	w.RegisterServer(mailMock)
 
 	// create an invalid request
-	req := SyncMailRequest{Lower: 10, Upper: 5}
+	req := SyncMailRequest{Limit: 10, Lower: 10, Upper: 5}
 	require.Error(t, req.Validate())
 
 	go func() {
