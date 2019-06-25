@@ -16,17 +16,18 @@ func TestSyncMailRequestValidate(t *testing.T) {
 		Error string
 	}{
 		{
-			Name: "empty request is valid",
-			Req:  SyncMailRequest{},
+			Name:  "invalid zero Limit",
+			Req:   SyncMailRequest{},
+			Error: "invalid 'Limit' value, expected value greater than 0",
 		},
 		{
-			Name:  "invalid Limit",
+			Name:  "invalid large Limit",
 			Req:   SyncMailRequest{Limit: 1e6},
-			Error: "invalid 'Limit' value, expected lower than 1000",
+			Error: "invalid 'Limit' value, expected value lower than 1000",
 		},
 		{
 			Name:  "invalid Lower",
-			Req:   SyncMailRequest{Lower: 10, Upper: 5},
+			Req:   SyncMailRequest{Limit: 10, Lower: 10, Upper: 5},
 			Error: "invalid 'Lower' value, can't be greater than 'Upper'",
 		},
 	}
