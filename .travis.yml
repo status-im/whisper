@@ -2,7 +2,7 @@ notifications:
   email: false
 language: go
 go:
-- 1.10.x
+- 1.12.x
 sudo: false
 jobs:
   include:
