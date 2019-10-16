@@ -326,9 +326,6 @@ func (msg *ReceivedMessage) ValidateAndParse() bool {
 			return false
 		}
 		payloadSize = int(bytesToUintLittleEndian(msg.Raw[beg : beg+sizeOfPayloadSizeField]))
-		if payloadSize+1 > end {
-			return false
-		}
 		beg += sizeOfPayloadSizeField
 		if beg+payloadSize > end {
 			return false
