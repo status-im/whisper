@@ -92,6 +92,8 @@ const (
 
 	EnvelopeTimeNotSynced uint = iota + 1
 	EnvelopeOtherError
+
+	MaxLimitInMessagesRequest = 1000
 )
 
 // MailServer represents a mail server, capable of
@@ -102,8 +104,48 @@ const (
 // in order to bypass the expiry checks.
 type MailServer interface {
 	Archive(env *Envelope)
+	// DEPRECATED
 	DeliverMail(whisperPeer *Peer, request *Envelope)
+	Deliver(whisperPeer *Peer, request *MessagesRequest) error
 	SyncMail(*Peer, SyncMailRequest) error
+}
+
+// MessagesRequest contains details of a request of historic messages.
+type MessagesRequest struct {
+	// From is a lower bound of time range.
+	From uint32 `json:"from"`
+
+	// To is a upper bound of time range.
+	To uint32 `json:"to"`
+
+	// Limit determines the number of messages sent by the mail server
+	// for the current paginated request.
+	Limit uint32 `json:"limit"`
+
+	// Cursor is used as starting point for paginated requests.
+	Cursor string `json:"cursor"`
+
+	// Topics is a list of Whisper topics.
+	Topics []TopicType `json:"topics"`
+
+	// Bloom is a filter to match requested messages.
+	Bloom []byte `json:"bloom"`
+}
+
+func (r MessagesRequest) Validate() error {
+	if r.From > r.To {
+		return errors.New("invalid 'From' value which is greated than To")
+	}
+
+	if r.Limit > MaxLimitInMessagesRequest {
+		return fmt.Errorf("invalid 'Limit' value, expected value lower than %d", MaxLimitInMessagesRequest)
+	}
+
+	if len(r.Topics) == 0 || len(r.Bloom) == 0 {
+		return errors.New("either 'Topics' or 'Bloom' must be provided")
+	}
+
+	return nil
 }
 
 // SyncMailRequest contains details which envelopes should be synced

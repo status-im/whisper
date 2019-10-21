@@ -1104,13 +1104,29 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 		case p2pRequestCode:
 			// Must be processed if mail server is implemented. Otherwise ignore.
 			if whisper.mailServer != nil {
-				var request Envelope
-				if err := packet.Decode(&request); err != nil {
-					log.Warn("failed to decode p2p request message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
-					return errors.New("invalid p2p request")
+				var requestDeprecated Envelope
+				errDepReq := packet.Decode(&requestDeprecated)
+				if errDepReq == nil {
+					whisper.mailServer.DeliverMail(p, &requestDeprecated)
+					continue
+				} else {
+					log.Info("failed to decode p2p request message (deprecated)", "peer", p.peer.ID(), "err", errDepReq)
 				}
 
-				whisper.mailServer.DeliverMail(p, &request)
+				var request MessagesRequest
+				errReq := packet.Decode(&request)
+				if errReq == nil {
+					err  := whisper.mailServer.Deliver(p, &request)
+					if  err != nil {
+						// do not disconnect peer immediately by purpose
+						log.Info("failed to deliver messages", "peer", p.peer.ID(), "err", err)
+					}
+					continue
+				} else {
+					log.Info("failed to decode p2p request message", "peer", p.peer.ID(), "err", errReq)
+				}
+
+				return errors.New("invalid p2p request")
 			}
 		case p2pRequestCompleteCode:
 			if p.trusted {
