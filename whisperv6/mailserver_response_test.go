@@ -35,7 +35,7 @@ func checkValidSuccessPayload(t *testing.T, id []byte, lastHash []byte, timestam
 	binary.LittleEndian.PutUint32(timestampBytes, timestamp)
 	envelopeHash := common.BytesToHash(envHash)
 	cursor := append(timestampBytes, envelopeHash[:]...)
-	successPayload := CreateMailServerRequestCompletedPayload(requestID, lastEnvelopeHash, cursor)
+	successPayload := CreateMailServerRequestCompletedPayload(common.BytesToHash(id), lastEnvelopeHash, cursor)
 	nid := enode.ID{1}
 	event, err := CreateMailServerEvent(nid, successPayload)
 
