@@ -112,6 +112,9 @@ type MailServer interface {
 
 // MessagesRequest contains details of a request of historic messages.
 type MessagesRequest struct {
+	// ID of the request.
+	ID string `json:"id"`
+
 	// From is a lower bound of time range.
 	From uint32 `json:"from"`
 
@@ -133,8 +136,12 @@ type MessagesRequest struct {
 }
 
 func (r MessagesRequest) Validate() error {
+	if r.ID == "" {
+		return errors.New("empty 'ID'")
+	}
+
 	if r.From > r.To {
-		return errors.New("invalid 'From' value which is greated than To")
+		return errors.New("invalid 'From' value which is greater than To")
 	}
 
 	if r.Limit > MaxLimitInMessagesRequest {
