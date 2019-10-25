@@ -1507,8 +1507,9 @@ func TestHandleP2PSyncResponseCode(t *testing.T) {
 
 type stubMailServer struct{}
 
-func (stubMailServer) Archive(env *Envelope)                 {}
+func (stubMailServer) Archive(*Envelope)                 {}
 func (stubMailServer) DeliverMail(*Peer, *Envelope)          {}
+func (stubMailServer) Deliver(*Peer, *MessagesRequest) error { return nil}
 func (stubMailServer) SyncMail(*Peer, SyncMailRequest) error { return nil }
 
 type mockMailServer struct {
@@ -1521,6 +1522,11 @@ func (m *mockMailServer) Archive(env *Envelope) {
 
 func (m *mockMailServer) DeliverMail(p *Peer, env *Envelope) {
 	m.Called(p, env)
+}
+
+func (m *mockMailServer) Deliver(p *Peer, r *MessagesRequest)error {
+	args := m.Called(p, r)
+	return args.Error(0)
 }
 
 func (m *mockMailServer) SyncMail(p *Peer, r SyncMailRequest) error {

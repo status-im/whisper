@@ -1,12 +1,14 @@
 notifications:
   email: false
 language: go
+env:
+  - GO111MODULE=on GOFLAGS=-mod=vendor
 go:
 - 1.12.x
+- 1.13.x
 sudo: false
 jobs:
   include:
   - stage: Unit tests
     script:
-      - go test ./whisperv6/...
-      - go test ./shhclient/...
+      - make test
