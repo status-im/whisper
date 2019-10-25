@@ -65,12 +65,12 @@ const (
 	SizeMask      = byte(3) // mask used to extract the size of payload size field from the flags
 	signatureFlag = byte(4)
 
-	TopicLength     = 4  // in bytes
+	TopicLength     = 4                      // in bytes
 	signatureLength = crypto.SignatureLength // in bytes
-	aesKeyLength    = 32 // in bytes
-	aesNonceLength  = 12 // in bytes; for more info please see cipher.gcmStandardNonceSize & aesgcm.NonceSize()
-	keyIDSize       = 32 // in bytes
-	BloomFilterSize = 64 // in bytes
+	aesKeyLength    = 32                     // in bytes
+	aesNonceLength  = 12                     // in bytes; for more info please see cipher.gcmStandardNonceSize & aesgcm.NonceSize()
+	keyIDSize       = 32                     // in bytes
+	BloomFilterSize = 64                     // in bytes
 	flagsLength     = 1
 
 	EnvelopeHeaderLength = 20
@@ -106,7 +106,7 @@ type MailServer interface {
 	Archive(env *Envelope)
 	// DEPRECATED
 	DeliverMail(whisperPeer *Peer, request *Envelope)
-	Deliver(whisperPeer *Peer, request *MessagesRequest) error
+	Deliver(whisperPeer *Peer, request MessagesRequest)
 	SyncMail(*Peer, SyncMailRequest) error
 }
 
@@ -126,10 +126,7 @@ type MessagesRequest struct {
 	Limit uint32 `json:"limit"`
 
 	// Cursor is used as starting point for paginated requests.
-	Cursor string `json:"cursor"`
-
-	// Topics is a list of Whisper topics.
-	Topics []TopicType `json:"topics"`
+	Cursor []byte `json:"cursor"`
 
 	// Bloom is a filter to match requested messages.
 	Bloom []byte `json:"bloom"`
@@ -148,8 +145,8 @@ func (r MessagesRequest) Validate() error {
 		return fmt.Errorf("invalid 'Limit' value, expected value lower than %d", MaxLimitInMessagesRequest)
 	}
 
-	if len(r.Topics) == 0 || len(r.Bloom) == 0 {
-		return errors.New("either 'Topics' or 'Bloom' must be provided")
+	if len(r.Bloom) == 0 {
+		return errors.New("invalid 'Bloom' provided")
 	}
 
 	return nil

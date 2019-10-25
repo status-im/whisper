@@ -1075,7 +1075,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 			// TODO(adam): currently, there is no feedback when a sync response
 			// is received. An idea to fix this:
 			//   1. Sending a request contains an ID,
-			//   2. Each sync reponse contains this ID,
+			//   2. Each sync response contains this ID,
 			//   3. There is a way to call whisper.SyncMessages() and wait for the response.Final to be received for that particular request ID.
 			//   4. If Cursor is not empty, another p2pSyncRequestCode should be sent.
 			if p.trusted && whisper.mailServer != nil {
@@ -1116,11 +1116,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				var request MessagesRequest
 				errReq := packet.Decode(&request)
 				if errReq == nil {
-					err  := whisper.mailServer.Deliver(p, &request)
-					if  err != nil {
-						// do not disconnect peer immediately by purpose
-						log.Info("failed to deliver messages", "peer", p.peer.ID(), "err", err)
-					}
+					whisper.mailServer.Deliver(p, request)
 					continue
 				} else {
 					log.Info("failed to decode p2p request message", "peer", p.peer.ID(), "err", errReq)
