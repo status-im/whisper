@@ -1355,6 +1355,41 @@ func TestRequestSentEventWithExpiry(t *testing.T) {
 	verifyEvent(EventMailServerRequestExpired)
 }
 
+func TestSendMessagesRequest(t *testing.T) {
+	validMessagesRequest := MessagesRequest{
+		ID:    make([]byte, 32),
+		From:  0,
+		To:    10,
+		Bloom: []byte{0x01},
+	}
+
+	t.Run("InvalidID", func(t *testing.T) {
+		w := New(nil)
+		err := w.SendMessagesRequest([]byte{0x01, 0x02}, MessagesRequest{})
+		require.EqualError(t, err, "invalid 'ID', expected a 32-byte slice")
+	})
+
+	t.Run("WithoutPeer", func(t *testing.T) {
+		w := New(nil)
+		err := w.SendMessagesRequest([]byte{0x01, 0x02}, validMessagesRequest)
+		require.EqualError(t, err, "Could not find peer with ID: 0102")
+	})
+
+	t.Run("AllGood", func(t *testing.T) {
+		p := p2p.NewPeer(enode.ID{0x01}, "peer01", nil)
+		rw1, rw2 := p2p.MsgPipe()
+		w := New(nil)
+		w.peers[newPeer(w, p, rw1)] = struct{}{}
+
+		go func() {
+			err := w.SendMessagesRequest(p.ID().Bytes(), validMessagesRequest)
+			require.NoError(t, err)
+		}()
+
+		require.NoError(t, p2p.ExpectMsg(rw2, p2pRequestCode, nil))
+	})
+}
+
 func TestSyncMessages(t *testing.T) {
 	t.Run("WithoutMailServer", func(t *testing.T) {
 		w := New(nil)
@@ -1507,8 +1542,9 @@ func TestHandleP2PSyncResponseCode(t *testing.T) {
 
 type stubMailServer struct{}
 
-func (stubMailServer) Archive(env *Envelope)                 {}
+func (stubMailServer) Archive(*Envelope)                     {}
 func (stubMailServer) DeliverMail(*Peer, *Envelope)          {}
+func (stubMailServer) Deliver(*Peer, MessagesRequest)        {}
 func (stubMailServer) SyncMail(*Peer, SyncMailRequest) error { return nil }
 
 type mockMailServer struct {
@@ -1521,6 +1557,10 @@ func (m *mockMailServer) Archive(env *Envelope) {
 
 func (m *mockMailServer) DeliverMail(p *Peer, env *Envelope) {
 	m.Called(p, env)
+}
+
+func (m *mockMailServer) Deliver(p *Peer, r MessagesRequest) {
+	m.Called(p, r)
 }
 
 func (m *mockMailServer) SyncMail(p *Peer, r SyncMailRequest) error {
