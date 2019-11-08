@@ -16,6 +16,7 @@ func (r *peerRateLimiter) Decorator(p *Peer, rw p2p.MsgReadWriter, runLoop runLo
 	defer out.Close()
 	errC := make(chan error, 1)
 
+	// Read from the original reader and write to the message pipe.
 	go func() {
 		for {
 			packet, err := rw.ReadMsg()
@@ -28,6 +29,21 @@ func (r *peerRateLimiter) Decorator(p *Peer, rw p2p.MsgReadWriter, runLoop runLo
 			// TODO: use whitelisting for cluster peers.
 
 			if err := in.WriteMsg(packet); err != nil {
+				errC <- fmt.Errorf("failed to write packet to pipe: %v", err)
+				return
+			}
+		}
+	}()
+
+	// Read from the message pipe and write to the original writer.
+	go func() {
+		for {
+			packet, err := in.ReadMsg()
+			if err != nil {
+				errC <- fmt.Errorf("failed to read packet from pipe: %v", err)
+				return
+			}
+			if err := rw.WriteMsg(packet); err != nil {
 				errC <- fmt.Errorf("failed to write packet: %v", err)
 				return
 			}
