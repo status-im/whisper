@@ -89,6 +89,8 @@ github.com/syndtr/goleveldb/leveldb/opt
 github.com/syndtr/goleveldb/leveldb/storage
 github.com/syndtr/goleveldb/leveldb/table
 github.com/syndtr/goleveldb/leveldb/util
+# github.com/tsenart/tb v0.0.0-20181025101425-0d2499c8b6e9
+github.com/tsenart/tb
 # golang.org/x/crypto v0.0.0-20190103213133-ff983b9c42bc
 golang.org/x/crypto/pbkdf2
 golang.org/x/crypto/sha3
