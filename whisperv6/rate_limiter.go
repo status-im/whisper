@@ -2,13 +2,45 @@ package whisperv6
 
 import (
 	"fmt"
+	"time"
+
+	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/tsenart/tb"
+)
+
+const (
+	rateLimitPerSecIP     = 10
+	rateLimitPerSecPeerID = 3
 )
 
 type runLoop func(p *Peer, rw p2p.MsgReadWriter) error
 
-type peerRateLimiter struct{}
+type rateLimiterHandler interface {
+	ExceedPeerLimit()
+	ExceedIPLimit()
+}
+
+type metricsRateLimiterHandler struct{}
+
+func (metricsRateLimiterHandler) ExceedPeerLimit() { rateLimiterPeerExceeded.Inc(1) }
+func (metricsRateLimiterHandler) ExceedIPLimit()   { rateLimiterIPExceeded.Inc(1) }
+
+type peerRateLimiter struct {
+	peerIDThrottler *tb.Throttler
+	ipThrottler     *tb.Throttler
+
+	handler rateLimiterHandler
+}
+
+func newPeerRateLimiter(handler rateLimiterHandler) *peerRateLimiter {
+	return &peerRateLimiter{
+		peerIDThrottler: tb.NewThrottler(time.Millisecond * 100),
+		ipThrottler:     tb.NewThrottler(time.Millisecond * 100),
+		handler:         handler,
+	}
+}
 
 func (r *peerRateLimiter) Decorator(p *Peer, rw p2p.MsgReadWriter, runLoop runLoop) error {
 	in, out := p2p.MsgPipe()
@@ -25,7 +57,16 @@ func (r *peerRateLimiter) Decorator(p *Peer, rw p2p.MsgReadWriter, runLoop runLo
 				return
 			}
 
-			// TODO: check rate limit for IP and peer ID.
+			ip := p.peer.Node().IP().String()
+			if halted := r.throttleIP(ip); halted {
+				r.handler.ExceedIPLimit()
+			}
+
+			peerID := p.ID()
+			if halted := r.throttlePeer(peerID); halted {
+				r.handler.ExceedPeerLimit()
+			}
+
 			// TODO: use whitelisting for cluster peers.
 
 			if err := in.WriteMsg(packet); err != nil {
@@ -55,4 +96,18 @@ func (r *peerRateLimiter) Decorator(p *Peer, rw p2p.MsgReadWriter, runLoop runLo
 	}()
 
 	return <-errC
+}
+
+// throttleIP throttles a number of messages incoming from a given IP.
+// It allows 10 packets per second.
+func (r *peerRateLimiter) throttleIP(ip string) bool {
+	return r.ipThrottler.Halt(ip, 1, rateLimitPerSecIP)
+}
+
+// throttlePeer throttles a number of messages incoming from a peer.
+// It allows 3 packets per second.
+func (r *peerRateLimiter) throttlePeer(peerID []byte) bool {
+	var id enode.ID
+	copy(id[:], peerID)
+	return r.peerIDThrottler.Halt(id.String(), 1, rateLimitPerSecPeerID)
 }
