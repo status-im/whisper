@@ -887,8 +887,8 @@ func (whisper *Whisper) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 	whisperPeer.start()
 	defer whisperPeer.stop()
 
-	r := peerRateLimiter{}
-	return r.Decorator(whisperPeer, rw, whisper.runMessageLoop)
+	r := newPeerRateLimiter(&metricsRateLimiterHandler{})
+	return r.Decorate(whisperPeer, rw, whisper.runMessageLoop)
 }
 
 func (whisper *Whisper) sendConfirmation(peer enode.ID, rw p2p.MsgReadWriter, data []byte,

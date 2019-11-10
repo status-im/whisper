@@ -42,7 +42,7 @@ func newPeerRateLimiter(handler rateLimiterHandler) *peerRateLimiter {
 	}
 }
 
-func (r *peerRateLimiter) Decorator(p *Peer, rw p2p.MsgReadWriter, runLoop runLoop) error {
+func (r *peerRateLimiter) Decorate(p *Peer, rw p2p.MsgReadWriter, runLoop runLoop) error {
 	in, out := p2p.MsgPipe()
 	defer in.Close()
 	defer out.Close()
@@ -57,12 +57,18 @@ func (r *peerRateLimiter) Decorator(p *Peer, rw p2p.MsgReadWriter, runLoop runLo
 				return
 			}
 
-			ip := p.peer.Node().IP().String()
+			var ip string
+			if p != nil && p.peer != nil {
+				ip = p.peer.Node().IP().String()
+			}
 			if halted := r.throttleIP(ip); halted {
 				r.handler.ExceedIPLimit()
 			}
 
-			peerID := p.ID()
+			var peerID []byte
+			if p != nil {
+				peerID = p.ID()
+			}
 			if halted := r.throttlePeer(peerID); halted {
 				r.handler.ExceedPeerLimit()
 			}

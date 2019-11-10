@@ -36,8 +36,8 @@ func TestPeerRateLimiterDecorator(t *testing.T) {
 		return nil
 	}
 
-	r := peerRateLimiter{}
-	err := r.Decorator(nil, out, runLoop)
+	r := newPeerRateLimiter(&mockRateLimiterHandler{})
+	err := r.Decorate(nil, out, runLoop)
 	require.NoError(t, err)
 
 	receivedMsg := <-messages
@@ -58,7 +58,7 @@ func TestPeerLimiterHandler(t *testing.T) {
 	count := 100
 
 	go func() {
-		err := r.Decorator(p, rw2, func(p *Peer, rw p2p.MsgReadWriter) error {
+		err := r.Decorate(p, rw2, func(p *Peer, rw p2p.MsgReadWriter) error {
 			for {
 				msg, err := rw.ReadMsg()
 				if err != nil {
