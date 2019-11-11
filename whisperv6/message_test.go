@@ -470,3 +470,26 @@ func TestAesNonce(t *testing.T) {
 		t.Fatalf("Nonce size is wrong. This is a critical error. Apparently AES nonce size have changed in the new version of AES GCM package. Whisper will not be working until this problem is resolved.")
 	}
 }
+
+func TestValidateAndParseSizeOfPayloadSize(t *testing.T) {
+	testCases := []struct{
+		Name string
+		Raw []byte
+	}{
+		{
+			Name: "one byte of value 1",
+			Raw: []byte{1},
+		},
+		{
+			Name: "two bytes of values 1 and 1",
+			Raw: []byte{1, 1},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			msg := ReceivedMessage{Raw: tc.Raw}
+			msg.ValidateAndParse()
+		})
+	}
+}
