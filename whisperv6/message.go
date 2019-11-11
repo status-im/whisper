@@ -321,16 +321,27 @@ func (msg *ReceivedMessage) ValidateAndParse() bool {
 	beg := 1
 	payloadSize := 0
 	sizeOfPayloadSizeField := int(msg.Raw[0] & SizeMask) // number of bytes indicating the size of payload
-	if sizeOfPayloadSizeField != 0 {
+	if sizeOfPayloadSizeField != 0 && len(msg.Raw) > beg+sizeOfPayloadSizeField {
+
 		payloadSize = int(bytesToUintLittleEndian(msg.Raw[beg : beg+sizeOfPayloadSizeField]))
 		if payloadSize+1 > end {
 			return false
 		}
 		beg += sizeOfPayloadSizeField
+
+		if beg > beg+payloadSize || beg+payloadSize > len(msg.Raw) {
+			return false
+		}
+
 		msg.Payload = msg.Raw[beg : beg+payloadSize]
 	}
 
 	beg += payloadSize
+
+	if beg > end || end > len(msg.Raw) {
+		return false
+	}
+
 	msg.Padding = msg.Raw[beg:end]
 	return true
 }
