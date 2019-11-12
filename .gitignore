@@ -1,1 +1,5 @@
 .idea
+suppressions
+corpus
+crashers
+whisperv6-fuzz.zip
