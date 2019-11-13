@@ -36,7 +36,7 @@ func TestPeerRateLimiterDecorator(t *testing.T) {
 		return nil
 	}
 
-	r := NewPeerRateLimiter(&mockRateLimiterHandler{}, nil, nil)
+	r := NewPeerRateLimiter(&mockRateLimiterHandler{}, nil)
 	err := r.decorate(nil, out, runLoop)
 	require.NoError(t, err)
 
@@ -50,7 +50,7 @@ func TestPeerRateLimiterDecorator(t *testing.T) {
 
 func TestPeerLimiterHandler(t *testing.T) {
 	h := &mockRateLimiterHandler{}
-	r := NewPeerRateLimiter(h, nil, nil)
+	r := NewPeerRateLimiter(h, nil)
 	p := &Peer{
 		peer: p2p.NewPeer(enode.ID{0xaa, 0xbb, 0xcc}, "test-peer", nil),
 	}
@@ -79,14 +79,18 @@ func TestPeerLimiterHandler(t *testing.T) {
 
 	<-done
 
-	require.Equal(t, 100-rateLimitPerSecIP, h.exceedIPLimit)
-	require.Equal(t, 100-rateLimitPerSecPeerID, h.exceedPeerLimit)
+	require.Equal(t, 100-defaultPeerRateLimiterConfig.LimitPerSecIP, h.exceedIPLimit)
+	require.Equal(t, 100-defaultPeerRateLimiterConfig.LimitPerSecPeerID, h.exceedPeerLimit)
 }
 
 func TestPeerLimiterHandlerWithWhitelisting(t *testing.T) {
 	h := &mockRateLimiterHandler{}
-	// no IP is represented as <nil> string
-	r := NewPeerRateLimiter(h, []string{"<nil>"}, []enode.ID{enode.ID{0xaa, 0xbb, 0xcc}})
+	r := NewPeerRateLimiter(h, &PeerRateLimiterConfig{
+		LimitPerSecIP:      1,
+		LimitPerSecPeerID:  1,
+		WhitelistedIPs:     []string{"<nil>"}, // no IP is represented as <nil> string
+		WhitelistedPeerIDs: []enode.ID{enode.ID{0xaa, 0xbb, 0xcc}},
+	})
 	p := &Peer{
 		peer: p2p.NewPeer(enode.ID{0xaa, 0xbb, 0xcc}, "test-peer", nil),
 	}
