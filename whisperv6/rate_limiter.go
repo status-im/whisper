@@ -82,6 +82,8 @@ func (r *PeerRateLimiter) decorate(p *Peer, rw p2p.MsgReadWriter, runLoop runLoo
 				return
 			}
 
+			rateLimiterProcessed.Inc(1)
+
 			var ip string
 			if p != nil && p.peer != nil {
 				ip = p.peer.Node().IP().String()
