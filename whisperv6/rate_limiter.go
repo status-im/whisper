@@ -2,7 +2,6 @@ package whisperv6
 
 import (
 	"bytes"
-	"encoding/hex"
 	"fmt"
 	"time"
 
@@ -19,10 +18,10 @@ type RateLimiterHandler interface {
 	ExceedIPLimit()
 }
 
-type metricsRateLimiterHandler struct{}
+type MetricsRateLimiterHandler struct{}
 
-func (metricsRateLimiterHandler) ExceedPeerLimit() { rateLimiterPeerExceeded.Inc(1) }
-func (metricsRateLimiterHandler) ExceedIPLimit()   { rateLimiterIPExceeded.Inc(1) }
+func (MetricsRateLimiterHandler) ExceedPeerLimit() { rateLimiterPeerExceeded.Inc(1) }
+func (MetricsRateLimiterHandler) ExceedIPLimit()   { rateLimiterIPExceeded.Inc(1) }
 
 type PeerRateLimiterConfig struct {
 	LimitPerSecIP      int64
@@ -164,25 +163,4 @@ func enodeIDSliceContains(s []enode.ID, searched enode.ID) bool {
 		}
 	}
 	return false
-}
-
-func stringToEnodeID(peerID string) (id enode.ID, err error) {
-	data, err := hex.DecodeString(peerID)
-	if err != nil {
-		return
-	}
-	copy(id[:], data)
-	return
-}
-
-func StringSliceToEnodeIDs(s []string) ([]enode.ID, error) {
-	var result []enode.ID
-	for _, item := range s {
-		id, err := stringToEnodeID(item)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, id)
-	}
-	return result, nil
 }
