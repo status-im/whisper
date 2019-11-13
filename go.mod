@@ -8,7 +8,6 @@ require (
 	github.com/btcsuite/btcd v0.0.0-20181013004428-67e573d211ac // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/deckarep/golang-set v1.7.1
-	github.com/dvyukov/go-fuzz v0.0.0-20191022152526-8cb203812681 // indirect
 	github.com/ethereum/go-ethereum v1.9.5
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db // indirect

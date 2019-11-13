@@ -79,8 +79,8 @@ func TestPeerLimiterHandler(t *testing.T) {
 
 	<-done
 
-	require.Equal(t, 100-defaultPeerRateLimiterConfig.LimitPerSecIP, h.exceedIPLimit)
-	require.Equal(t, 100-defaultPeerRateLimiterConfig.LimitPerSecPeerID, h.exceedPeerLimit)
+	require.EqualValues(t, 100-defaultPeerRateLimiterConfig.LimitPerSecIP, h.exceedIPLimit)
+	require.EqualValues(t, 100-defaultPeerRateLimiterConfig.LimitPerSecPeerID, h.exceedPeerLimit)
 }
 
 func TestPeerLimiterHandlerWithWhitelisting(t *testing.T) {
