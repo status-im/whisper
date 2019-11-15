@@ -441,6 +441,7 @@ func (whisper *Whisper) RequestHistoricMessagesWithTimeout(peerID []byte, envelo
 	}
 	whisper.envelopeFeed.Send(EnvelopeEvent{
 		Peer:  p.peer.ID(),
+		Topic: envelope.Topic,
 		Hash:  envelope.Hash(),
 		Event: EventMailServerRequestSent,
 	})
@@ -957,6 +958,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 
 				whisper.envelopeFeed.Send(EnvelopeEvent{
 					Event: EventEnvelopeReceived,
+					Topic: env.Topic,
 					Hash:  env.Hash(),
 					Peer:  p.peer.ID(),
 				})
@@ -1280,6 +1282,7 @@ func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
 		if whisper.mailServer != nil {
 			whisper.mailServer.Archive(envelope)
 			whisper.envelopeFeed.Send(EnvelopeEvent{
+				Topic: envelope.Topic,
 				Hash:  envelope.Hash(),
 				Event: EventMailServerEnvelopeArchived,
 			})
@@ -1329,6 +1332,7 @@ func (whisper *Whisper) processQueue() {
 		case e := <-whisper.messageQueue:
 			whisper.filters.NotifyWatchers(e, false)
 			whisper.envelopeFeed.Send(EnvelopeEvent{
+				Topic: e.Topic,
 				Hash:  e.Hash(),
 				Event: EventEnvelopeAvailable,
 			})
@@ -1346,6 +1350,7 @@ func (whisper *Whisper) processP2P() {
 			case *Envelope:
 				whisper.filters.NotifyWatchers(event, true)
 				whisper.envelopeFeed.Send(EnvelopeEvent{
+					Topic: event.Topic,
 					Hash:  event.Hash(),
 					Event: EventEnvelopeAvailable,
 				})
