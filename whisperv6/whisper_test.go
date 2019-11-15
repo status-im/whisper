@@ -1540,6 +1540,42 @@ func TestHandleP2PSyncResponseCode(t *testing.T) {
 	mailMock.AssertNumberOfCalls(t, "Archive", envelopesCount)
 }
 
+func TestRateLimiterIntegration(t *testing.T) {
+	conf := &Config{
+		MinimumAcceptedPOW: 0,
+		MaxMessageSize:     10 << 20,
+	}
+	w := New(conf)
+	w.SetRateLimiter(NewPeerRateLimiter(&MetricsRateLimiterHandler{}, nil))
+	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"shh", 6}})
+	rw1, rw2 := p2p.MsgPipe()
+	defer func() {
+		rw1.Close()
+		rw2.Close()
+	}()
+	errorc := make(chan error, 1)
+	go func() {
+		err := w.HandlePeer(p, rw2)
+		errorc <- err
+	}()
+	require.NoError(t, p2p.ExpectMsg(rw1, statusCode, []interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true}))
+	require.NoError(t, p2p.SendItems(rw1, statusCode, ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), true, true))
+
+	envelope := Envelope{
+		Expiry: uint32(time.Now().Unix()),
+		TTL:    10,
+		Topic:  TopicType{1},
+		Data:   make([]byte, 1<<10),
+		Nonce:  1,
+	}
+
+	data, err := rlp.EncodeToBytes([]*Envelope{&envelope})
+	require.NoError(t, err)
+	hash := crypto.Keccak256Hash(data)
+	require.NoError(t, p2p.SendItems(rw1, messagesCode, &envelope))
+	require.NoError(t, p2p.ExpectMsg(rw1, messageResponseCode, NewMessagesResponse(hash, nil)))
+}
+
 type stubMailServer struct{}
 
 func (stubMailServer) Archive(*Envelope)                     {}

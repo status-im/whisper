@@ -36,8 +36,8 @@ func TestPeerRateLimiterDecorator(t *testing.T) {
 		return nil
 	}
 
-	r := newPeerRateLimiter(&mockRateLimiterHandler{})
-	err := r.Decorate(nil, out, runLoop)
+	r := NewPeerRateLimiter(&mockRateLimiterHandler{}, nil)
+	err := r.decorate(nil, out, runLoop)
 	require.NoError(t, err)
 
 	receivedMsg := <-messages
@@ -50,7 +50,7 @@ func TestPeerRateLimiterDecorator(t *testing.T) {
 
 func TestPeerLimiterHandler(t *testing.T) {
 	h := &mockRateLimiterHandler{}
-	r := newPeerRateLimiter(h)
+	r := NewPeerRateLimiter(h, nil)
 	p := &Peer{
 		peer: p2p.NewPeer(enode.ID{0xaa, 0xbb, 0xcc}, "test-peer", nil),
 	}
@@ -58,18 +58,7 @@ func TestPeerLimiterHandler(t *testing.T) {
 	count := 100
 
 	go func() {
-		err := r.Decorate(p, rw2, func(p *Peer, rw p2p.MsgReadWriter) error {
-			for {
-				msg, err := rw.ReadMsg()
-				if err != nil {
-					return err
-				}
-				err = rw.WriteMsg(msg)
-				if err != nil {
-					return err
-				}
-			}
-		})
+		err := echoMessages(r, p, rw2)
 		require.NoError(t, err)
 	}()
 
@@ -90,8 +79,63 @@ func TestPeerLimiterHandler(t *testing.T) {
 
 	<-done
 
-	require.Equal(t, 100-rateLimitPerSecIP, h.exceedIPLimit)
-	require.Equal(t, 100-rateLimitPerSecPeerID, h.exceedPeerLimit)
+	require.EqualValues(t, 100-defaultPeerRateLimiterConfig.LimitPerSecIP, h.exceedIPLimit)
+	require.EqualValues(t, 100-defaultPeerRateLimiterConfig.LimitPerSecPeerID, h.exceedPeerLimit)
+}
+
+func TestPeerLimiterHandlerWithWhitelisting(t *testing.T) {
+	h := &mockRateLimiterHandler{}
+	r := NewPeerRateLimiter(h, &PeerRateLimiterConfig{
+		LimitPerSecIP:      1,
+		LimitPerSecPeerID:  1,
+		WhitelistedIPs:     []string{"<nil>"}, // no IP is represented as <nil> string
+		WhitelistedPeerIDs: []enode.ID{enode.ID{0xaa, 0xbb, 0xcc}},
+	})
+	p := &Peer{
+		peer: p2p.NewPeer(enode.ID{0xaa, 0xbb, 0xcc}, "test-peer", nil),
+	}
+	rw1, rw2 := p2p.MsgPipe()
+	count := 100
+
+	go func() {
+		err := echoMessages(r, p, rw2)
+		require.NoError(t, err)
+	}()
+
+	done := make(chan struct{})
+	go func() {
+		for i := 0; i < count; i++ {
+			msg, err := rw1.ReadMsg()
+			require.NoError(t, err)
+			require.EqualValues(t, 101, msg.Code)
+		}
+		close(done)
+	}()
+
+	for i := 0; i < count; i += 1 {
+		err := rw1.WriteMsg(p2p.Msg{Code: 101})
+		require.NoError(t, err)
+	}
+
+	<-done
+
+	require.Equal(t, 0, h.exceedIPLimit)
+	require.Equal(t, 0, h.exceedPeerLimit)
+}
+
+func echoMessages(r *PeerRateLimiter, p *Peer, rw p2p.MsgReadWriter) error {
+	return r.decorate(p, rw, func(p *Peer, rw p2p.MsgReadWriter) error {
+		for {
+			msg, err := rw.ReadMsg()
+			if err != nil {
+				return err
+			}
+			err = rw.WriteMsg(msg)
+			if err != nil {
+				return err
+			}
+		}
+	})
 }
 
 type mockRateLimiterHandler struct {
