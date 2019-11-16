@@ -934,12 +934,14 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 			// decode the contained envelopes
 			data, err := ioutil.ReadAll(packet.Payload)
 			if err != nil {
+				envelopesRejectedCounter.WithLabelValues("failed_read").Inc()
 				log.Warn("failed to read envelopes data", "peer", p.peer.ID(), "error", err)
 				return errors.New("invalid enveloopes")
 			}
 
 			var envelopes []*Envelope
 			if err := rlp.DecodeBytes(data, &envelopes); err != nil {
+				envelopesRejectedCounter.WithLabelValues("invalid_data").Inc()
 				log.Warn("failed to decode envelopes, peer will be disconnected", "peer", p.peer.ID(), "err", err)
 				return errors.New("invalid envelopes")
 			}
@@ -962,6 +964,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					Hash:  env.Hash(),
 					Peer:  p.peer.ID(),
 				})
+				envelopesValidatedCounter.Inc()
 				if cached {
 					p.mark(env)
 				}
@@ -976,12 +979,14 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 		case messageResponseCode:
 			var multiResponse MultiVersionResponse
 			if err := packet.Decode(&multiResponse); err != nil {
+				envelopesRejectedCounter.WithLabelValues("failed_read").Inc()
 				log.Error("failed to decode messages response", "peer", p.peer.ID(), "error", err)
 				return errors.New("invalid response message")
 			}
 			if multiResponse.Version == 1 {
 				response, err := multiResponse.DecodeResponse1()
 				if err != nil {
+					envelopesRejectedCounter.WithLabelValues("invalid_data").Inc()
 					log.Error("failed to decode messages response into first version of response", "peer", p.peer.ID(), "error", err)
 				}
 				whisper.envelopeFeed.Send(EnvelopeEvent{
@@ -1008,11 +1013,13 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 			s := rlp.NewStream(packet.Payload, uint64(packet.Size))
 			i, err := s.Uint()
 			if err != nil {
+				envelopesRejectedCounter.WithLabelValues("invalid_pow_req").Inc()
 				log.Warn("failed to decode powRequirementCode message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
 				return errors.New("invalid powRequirementCode message")
 			}
 			f := math.Float64frombits(i)
 			if math.IsInf(f, 0) || math.IsNaN(f) || f < 0.0 {
+				envelopesRejectedCounter.WithLabelValues("invalid_pow_req").Inc()
 				log.Warn("invalid value in powRequirementCode message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
 				return errors.New("invalid value in powRequirementCode message")
 			}
@@ -1026,6 +1033,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 
 			if err != nil {
 				log.Warn("failed to decode bloom filter exchange message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
+				envelopesRejectedCounter.WithLabelValues("invalid_bloom").Inc()
 				return errors.New("invalid bloom filter exchange message")
 			}
 			p.setBloomFilter(bloom)
@@ -1206,7 +1214,7 @@ func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
 	now := uint32(whisper.timeSource().Unix())
 	sent := envelope.Expiry - envelope.TTL
 
-	envelopesCounter.Inc()
+	envelopesReceivedCounter.Inc()
 	if sent > now {
 		if sent-DefaultSyncAllowance > now {
 			envelopesCacheFailedCounter.WithLabelValues("in_future").Inc()
