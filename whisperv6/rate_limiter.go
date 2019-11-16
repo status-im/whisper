@@ -40,7 +40,7 @@ type PeerRateLimiterConfig struct {
 	WhitelistedPeerIDs []enode.ID
 }
 
-var defaultPeerRateLimiterConfig = PeerRateLimiterConfig{
+var peerRateLimiterDefaults = PeerRateLimiterConfig{
 	LimitPerSecIP:      10,
 	LimitPerSecPeerID:  5,
 	WhitelistedIPs:     nil,
@@ -62,7 +62,7 @@ type PeerRateLimiter struct {
 
 func NewPeerRateLimiter(handler RateLimiterHandler, cfg *PeerRateLimiterConfig) *PeerRateLimiter {
 	if cfg == nil {
-		copy := defaultPeerRateLimiterConfig
+		copy := peerRateLimiterDefaults
 		cfg = &copy
 	}
 
