@@ -48,6 +48,16 @@ func TestPeerRateLimiterDecorator(t *testing.T) {
 	require.Equal(t, payload, receivedPayload)
 }
 
+func TestPeerLimiterThrottlingWithZeroLimit(t *testing.T) {
+	r := NewPeerRateLimiter(&mockRateLimiterHandler{}, &PeerRateLimiterConfig{})
+	for i := 0; i < 1000; i++ {
+		throttle := r.throttleIP("<nil>")
+		require.False(t, throttle)
+		throttle = r.throttlePeer([]byte{0x01, 0x02, 0x03})
+		require.False(t, throttle)
+	}
+}
+
 func TestPeerLimiterHandler(t *testing.T) {
 	h := &mockRateLimiterHandler{}
 	r := NewPeerRateLimiter(h, nil)
